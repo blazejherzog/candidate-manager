@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.candidate-manager</groupId>
+	<artifactId>candidate-manager</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>candidate-manager</name>
+	<description>Modular Candidate Manager</description>
+
+	<modules>
+		<module>cm-shared</module>
+		<module>cm-auth</module>
+		<module>cm-candidate</module>
+		<module>cm-job</module>
+		<module>cm-resume</module>
+		<module>cm-event</module>
+		<module>cm-integration</module>
+		<module>cm-app</module>
+	</modules>
+
+	<properties>
+		<java.version>21</java.version>
+		<spring.boot.version>3.5.8</spring.boot.version>
+		<lombok.version>1.18.30</lombok.version>
+		<kafka.version>3.5.1</kafka.version>
+		<testcontainers.version>1.19.0</testcontainers.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-shared</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-auth</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-candidate</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-job</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-resume</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-event</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-integration</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-dependencies</artifactId>
+				<version>${spring.boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.11.0</version>
+					<configuration>
+						<source>${java.version}</source>
+						<target>${java.version}</target>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+</project>
