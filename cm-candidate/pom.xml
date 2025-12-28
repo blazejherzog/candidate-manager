@@ -13,5 +13,11 @@
 
     <artifactId>cm-candidate</artifactId>
     <packaging>jar</packaging>
-    
+    <dependencies>
+        <dependency>
+            <groupId>com.candidate-manager</groupId>
+            <artifactId>cm-shared</artifactId>
+        </dependency>
+    </dependencies>
+
 </project>

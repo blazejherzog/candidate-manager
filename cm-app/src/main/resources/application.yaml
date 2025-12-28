@@ -19,9 +19,21 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8081/realms/cm-realm
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
 keycloak:
   url: http://localhost:8081
   realm: cm-realm
   client-id: cm-client
   client-secret: z66o4AGkCrSWpn2jjH8j2BqmjtLV6xy6
+
+rabbitmq:
+  queues:
+    - name: candidate.created.queue
+      exchange: candidate.exchange
+      routing-key: candidate.created
+      durable: true
