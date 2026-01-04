@@ -1,4 +1,4 @@
-package com.candidate_manager.shared.config.messaging;
+package com.candidate_manager.shared.config.messaging.config;
 
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;

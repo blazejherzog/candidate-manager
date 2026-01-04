@@ -1,4 +1,4 @@
-package com.candidate_manager.shared.config.messaging;
+package com.candidate_manager.shared.config.messaging.config;
 
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;

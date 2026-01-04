@@ -1,4 +1,4 @@
-package com.candidate_manager.shared.config.messaging;
+package com.candidate_manager.shared.config.messaging.event;
 
 import java.util.UUID;
 
@@ -12,5 +12,14 @@ public record CandidateCreatedEvent(
     @Override
     public UUID getEventId() {
         return eventId;
+    }
+
+    @Override
+    public String getExchange() {
+        return "candidate.exchange";
+    }
+    @Override
+    public String getRoutingKey() {
+        return "candidate.created";
     }
 }

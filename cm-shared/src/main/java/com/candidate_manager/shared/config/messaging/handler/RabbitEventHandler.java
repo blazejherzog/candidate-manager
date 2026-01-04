@@ -1,4 +1,4 @@
-package com.candidate_manager.shared.config.messaging;
+package com.candidate_manager.shared.config.messaging.handler;
 
 import org.springframework.stereotype.Component;
 

@@ -1,5 +1,7 @@
-package com.candidate_manager.shared.config.messaging;
+package com.candidate_manager.shared.config.messaging.handler;
 
+import com.candidate_manager.shared.config.messaging.processed.ProcessedEventRepository;
+import com.candidate_manager.shared.config.messaging.event.DomainEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -23,12 +25,12 @@ public class RabbitEventDispatcher {
                 throw new IllegalArgumentException("Idempotent event must be of type DomainEvent");
             }
 
-            if (processedEventRepository.existsByEventId(domainEvent.getEventId())) {
+            if (processedEventRepository.exists(domainEvent.getEventId())) {
                 return;
             }
 
             eventHandler.handle(event);
-            processedEventRepository.save(domainEvent.getEventId());
+            processedEventRepository.markAsProcessed(domainEvent.getEventId());
         } else {
             eventHandler.handle(event);
         }
