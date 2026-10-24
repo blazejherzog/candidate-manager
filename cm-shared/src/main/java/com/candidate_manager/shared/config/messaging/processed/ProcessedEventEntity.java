@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "processed_event")
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // dla JPA
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class ProcessedEventEntity {
 
@@ -21,10 +21,7 @@ public class ProcessedEventEntity {
     @Column(name = "event_id", nullable = false)
     private UUID eventId;
 
-    private LocalDateTime processedAt = LocalDateTime.now();
+    @Column(name = "processed_at", nullable = false)
+    private LocalDateTime processedAt;
 
-    public ProcessedEventEntity(UUID eventId) {
-        this.eventId = eventId;
-        this.processedAt = LocalDateTime.now();
-    }
 }

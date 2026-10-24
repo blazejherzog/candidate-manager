@@ -4,6 +4,7 @@ import com.candidate_manager.shared.config.messaging.processed.ProcessedEventRep
 import com.candidate_manager.shared.config.messaging.event.DomainEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -12,6 +13,7 @@ public class RabbitEventDispatcher {
     private final EventHandlerRegistry eventHandlerRegistry;
     private final ProcessedEventRepository processedEventRepository;
 
+    @Transactional
     public <T> void dispatch(T event) {
         Class<T> eventClass = getEventClass(event);
 
@@ -25,12 +27,11 @@ public class RabbitEventDispatcher {
                 throw new IllegalArgumentException("Idempotent event must be of type DomainEvent");
             }
 
-            if (processedEventRepository.exists(domainEvent.getEventId())) {
+            if (!processedEventRepository.tryMarkAsProcessed(domainEvent.getEventId())) {
                 return;
             }
 
             eventHandler.handle(event);
-            processedEventRepository.markAsProcessed(domainEvent.getEventId());
         } else {
             eventHandler.handle(event);
         }

@@ -12,12 +12,7 @@ public class ProcessedEventRepositoryImpl implements ProcessedEventRepository {
     private final ProcessedEventJpaRepository processedEventJpaRepository;
 
     @Override
-    public boolean exists(UUID eventId) {
-        return processedEventJpaRepository.existsByEventId(eventId);
-    }
-
-    @Override
-    public void markAsProcessed(UUID eventId) {
-        processedEventJpaRepository.save(new ProcessedEventEntity(eventId));
+    public boolean tryMarkAsProcessed(UUID eventId) {
+        return processedEventJpaRepository.insertProcessedEvent(eventId) == 1;
     }
 }
