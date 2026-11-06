@@ -24,6 +24,7 @@ spring:
     port: 5672
     username: guest
     password: guest
+    publisher-confirm-type: simple
 
 keycloak:
   url: http://localhost:8081
@@ -37,3 +38,10 @@ rabbitmq:
       exchange: candidate.exchange
       routing-key: candidate.created
       durable: true
+
+outbox:
+  relay:
+    enabled: true
+    fixed-delay: 1000
+    batch-size: 50
+    confirm-timeout: 5000
