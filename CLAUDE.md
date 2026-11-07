@@ -81,11 +81,31 @@ The `cm-realm` realm in Keycloak must be configured manually (no export in the r
   more than one implementation or a real testing need.
 - Commit message format (for reference): `[CM-<n>] Description`.
 
+## Messaging
+- Publishing: `EventPublisher.publish()` only inserts into `outbox_event` and requires an active
+  transaction (`Propagation.MANDATORY`). `OutboxRelay` sends pending rows to RabbitMQ in batches
+  (`FOR UPDATE SKIP LOCKED`), waits for a publisher confirm per message and marks the row as published.
+  Delivery is at-least-once.
+- Consuming: handlers annotated `@Idempotent` are deduplicated by inserting `event_id` into
+  `processed_event` (`ON CONFLICT DO NOTHING`) in the same transaction as the handler's effect.
+- Every configured queue gets a dead-letter queue `<queue>.dlq` (via exchange `cm.dlx`); messages
+  matching no binding go to `cm.unroutable.queue` (alternate exchange `cm.unroutable`).
+- RabbitMQ cannot change arguments of an existing queue/exchange (`PRECONDITION_FAILED`). After changing
+  them, delete the queue/exchange in the local broker once (management UI: http://localhost:15672).
+- The relay scheduler is disabled in tests (`cm-app/src/test/resources/config/application.yaml`);
+  tests call `OutboxRelay.publishPendingEvents()` directly.
+
 ## Known technical debt
-- `RabbitEventDispatcher`: idempotency without a transaction (exists → handle → mark), prone to races.
-- `RabbitEventPublisher`: publishes without an outbox.
 - Keycloak `client-secret` stored in `application.yaml` in the repo.
 - `CandidateCreated` listener and handler live in `cm-shared` instead of a domain module.
-- Listener retry has no dead-letter queue: after 3 failed attempts a message is silently dropped.
 - `DynamicRabbitConfig` declares queues eagerly in `@PostConstruct`, so the application
   (and every Spring Boot test) cannot start without a running RabbitMQ broker.
+- Outbox: published rows are never deleted (no cleanup job).
+- Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
+  fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
+- Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider
+  more relay instances, batched confirms or correlated confirms.
+- `processed_event` is keyed by `event_id` only and `EventHandlerRegistry` keeps one handler per event
+  type (a second one silently overrides the first). Supporting several consumers of one event needs
+  a `(event_id, consumer)` key.
+- Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling.

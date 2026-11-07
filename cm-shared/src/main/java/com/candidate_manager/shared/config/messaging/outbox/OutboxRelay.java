@@ -1,5 +1,6 @@
 package com.candidate_manager.shared.config.messaging.outbox;
 
+import com.rabbitmq.client.ShutdownSignalException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
@@ -36,7 +37,7 @@ public class OutboxRelay {
             try {
                 log.debug("Publishing outbox event: {}", outboxEvent.getId());
                 sendAndWaitForConfirmation(outboxEvent);
-            } catch (AmqpException e) {
+            } catch (AmqpException | ShutdownSignalException e) {
                 log.error("Failed to publish outbox event {}, stopping batch; will retry on next run", outboxEvent.getId(), e);
                 break;
             }
