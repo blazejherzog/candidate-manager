@@ -14,7 +14,7 @@ public interface OutboxEventJpaRepository extends JpaRepository<OutboxEventEntit
             SELECT *
             FROM outbox_event
             WHERE published_at IS NULL
-            ORDER BY created_at
+            ORDER BY sequence_number
             LIMIT :limit
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)

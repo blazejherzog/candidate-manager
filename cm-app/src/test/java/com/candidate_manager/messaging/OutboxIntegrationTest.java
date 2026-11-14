@@ -148,7 +148,7 @@ class OutboxIntegrationTest {
     void keepsEventsSentBeforeFailureMarkedAndDoesNotResendThem() {
         TestOutboxEvent sentEvent = eventTo(EXISTING_EXCHANGE);
         TestOutboxEvent failingEvent = eventTo(MISSING_EXCHANGE);
-        // Separate transactions give the failing event a later created_at, so it is sent second.
+        // Stored after sentEvent, so it gets a higher sequence_number and is sent second.
         publishInTransaction(sentEvent);
         publishInTransaction(failingEvent);
 
@@ -160,6 +160,66 @@ class OutboxIntegrationTest {
         assertThat(outboxRelay.publishPendingEvents()).isZero();
         assertThat(publishedAt(sentEvent)).isEqualTo(firstPublishedAt);
         assertThat(publishedAt(failingEvent)).isNull();
+    }
+
+    @Test
+    void sendsEventsStoredInOneTransactionInInsertionOrder() {
+        // Events stored in one transaction share created_at (now() is the transaction start time),
+        // so only sequence_number decides that the failing event is sent first and stops the batch.
+        TestOutboxEvent failingEvent = eventTo(MISSING_EXCHANGE);
+        List<TestOutboxEvent> laterEvents = List.of(
+                eventTo(EXISTING_EXCHANGE), eventTo(EXISTING_EXCHANGE), eventTo(EXISTING_EXCHANGE));
+        transactionTemplate.executeWithoutResult(status -> {
+            eventPublisher.publish(failingEvent);
+            laterEvents.forEach(eventPublisher::publish);
+        });
+
+        assertThat(outboxRelay.publishPendingEvents()).isZero();
+        assertThat(publishedAt(failingEvent)).isNull();
+        laterEvents.forEach(event -> assertThat(publishedAt(event)).isNull());
+    }
+
+    @Test
+    void relaySkipsEventLockedByAnotherTransaction() throws Exception {
+        TestOutboxEvent lockedEvent = eventTo(EXISTING_EXCHANGE);
+        TestOutboxEvent freeEvent = eventTo(EXISTING_EXCHANGE);
+        publishInTransaction(lockedEvent);
+        publishInTransaction(freeEvent);
+
+        CountDownLatch rowLocked = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            // Holds a row lock on lockedEvent in its own transaction, as another relay instance would.
+            Future<?> lockHolder = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                jdbcTemplate.queryForObject(
+                        "SELECT id FROM outbox_event WHERE id = ? FOR UPDATE", UUID.class, lockedEvent.eventId());
+                rowLocked.countDown();
+                try {
+                    releaseLock.await(30, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }));
+            assertThat(rowLocked.await(10, TimeUnit.SECONDS)).isTrue();
+
+            int publishedWhileLocked = outboxRelay.publishPendingEvents();
+
+            releaseLock.countDown();
+            lockHolder.get(10, TimeUnit.SECONDS);
+
+            assertThat(publishedWhileLocked).isEqualTo(1);
+        } finally {
+            releaseLock.countDown();
+            executor.shutdownNow();
+        }
+
+        assertThat(publishedAt(lockedEvent)).isNull();
+        assertThat(publishedAt(freeEvent)).isNotNull();
+
+        assertThat(outboxRelay.publishPendingEvents()).isEqualTo(1);
+        assertThat(publishedAt(lockedEvent)).isNotNull();
     }
 
     @Test

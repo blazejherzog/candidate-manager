@@ -35,6 +35,7 @@ Rules:
 ```bash
 docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ :5672/:15672
 ./mvnw -pl cm-app -am spring-boot:run
+./mvnw -DskipTests package           # executable jar: cm-app/target/cm-app-<version>.jar
 ./mvnw test                          # requires running Docker (Testcontainers)
 ./mvnw -pl <module> -am test         # tests for a single module
 ```
@@ -86,6 +87,8 @@ The `cm-realm` realm in Keycloak must be configured manually (no export in the r
   transaction (`Propagation.MANDATORY`). `OutboxRelay` sends pending rows to RabbitMQ in batches
   (`FOR UPDATE SKIP LOCKED`), waits for a publisher confirm per message and marks the row as published.
   Delivery is at-least-once.
+- Order: rows are sent by `sequence_number` (insertion order), which is stable within one transaction.
+  Across concurrent transactions it is not commit order, so consumers must not rely on global ordering.
 - Consuming: handlers annotated `@Idempotent` are deduplicated by inserting `event_id` into
   `processed_event` (`ON CONFLICT DO NOTHING`) in the same transaction as the handler's effect.
 - Every configured queue gets a dead-letter queue `<queue>.dlq` (via exchange `cm.dlx`); messages

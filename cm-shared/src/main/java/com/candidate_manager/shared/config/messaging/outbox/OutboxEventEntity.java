@@ -1,6 +1,6 @@
 package com.candidate_manager.shared.config.messaging.outbox;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -37,9 +37,9 @@ public class OutboxEventEntity {
     private String payload;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Column(name = "published_at")
-    private LocalDateTime publishedAt;
+    private Instant publishedAt;
 }
 

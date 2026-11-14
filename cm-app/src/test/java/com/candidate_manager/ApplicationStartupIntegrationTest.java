@@ -23,7 +23,7 @@ class ApplicationStartupIntegrationTest {
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank",
                 String.class);
 
-        assertThat(appliedVersions).contains("1");
+        assertThat(appliedVersions).contains("1", "2", "3");
     }
 
     @Test

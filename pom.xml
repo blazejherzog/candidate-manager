@@ -81,6 +81,11 @@
 				<plugin>
 					<groupId>org.springframework.boot</groupId>
 					<artifactId>spring-boot-maven-plugin</artifactId>
+					<version>${spring.boot.version}</version>
+					<configuration>
+						<!-- Only cm-app is runnable; other reactor modules skip spring-boot:run. -->
+						<skip>true</skip>
+					</configuration>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
