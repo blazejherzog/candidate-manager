@@ -1,5 +1,6 @@
 package com.candidate_manager.shared.config.messaging.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -11,8 +12,8 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitConfig {
 
     @Bean
-    public SmartMessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+    public SmartMessageConverter messageConverter(ObjectMapper objectMapper) {
+        return new Jackson2JsonMessageConverter(objectMapper);
     }
 
     @Bean

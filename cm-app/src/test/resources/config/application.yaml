@@ -1,3 +1,7 @@
 outbox:
   relay:
     enabled: false
+
+messaging:
+  retention:
+    enabled: false

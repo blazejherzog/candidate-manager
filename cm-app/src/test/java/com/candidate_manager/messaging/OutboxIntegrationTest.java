@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,14 +99,31 @@ class OutboxIntegrationTest {
     @Test
     void rejectsDuplicateEventIdWithoutOverwritingStoredEvent() {
         UUID eventId = UUID.randomUUID();
-        publishInTransaction(new TestOutboxEvent(eventId, EXISTING_EXCHANGE, ROUTING_KEY));
+        publishInTransaction(new TestOutboxEvent(eventId, Instant.now(), EXISTING_EXCHANGE, ROUTING_KEY));
 
-        assertThatThrownBy(() -> publishInTransaction(new TestOutboxEvent(eventId, MISSING_EXCHANGE, ROUTING_KEY)))
+        assertThatThrownBy(() -> publishInTransaction(new TestOutboxEvent(eventId, Instant.now(), MISSING_EXCHANGE, ROUTING_KEY)))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(countOutboxEvents()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT exchange FROM outbox_event WHERE id = ?", String.class, eventId))
                 .isEqualTo(EXISTING_EXCHANGE);
+    }
+
+    @Test
+    void storesPayloadWithOccurredAtAndWithoutRoutingDetails() {
+        Instant occurredAt = Instant.parse("2026-01-02T03:04:05Z");
+        CandidateCreatedEvent event = new CandidateCreatedEvent(
+                UUID.randomUUID(), occurredAt, "candidate-1", "Jan", "Kowalski", "jan.kowalski@example.com");
+
+        publishInTransaction(event);
+
+        Map<String, Object> payload = jdbcTemplate.queryForMap(
+                "SELECT payload->>'occurredAt' AS occurred_at, jsonb_exists(payload, 'exchange') AS has_exchange, "
+                        + "jsonb_exists(payload, 'routingKey') AS has_routing_key FROM outbox_event WHERE id = ?",
+                event.eventId());
+        assertThat(payload.get("occurred_at")).isEqualTo("2026-01-02T03:04:05Z");
+        assertThat(payload.get("has_exchange")).isEqualTo(false);
+        assertThat(payload.get("has_routing_key")).isEqualTo(false);
     }
 
     @Test
@@ -122,7 +140,7 @@ class OutboxIntegrationTest {
     @Test
     void deliversEventToIdempotentConsumerEndToEnd() {
         CandidateCreatedEvent event = new CandidateCreatedEvent(
-                UUID.randomUUID(), "candidate-1", "Jan", "Kowalski", "jan.kowalski@example.com");
+                UUID.randomUUID(), Instant.now(), "candidate-1", "Jan", "Kowalski", "jan.kowalski@example.com");
         publishInTransaction(event);
 
         assertThat(outboxRelay.publishPendingEvents()).isEqualTo(1);
@@ -259,7 +277,7 @@ class OutboxIntegrationTest {
     }
 
     private TestOutboxEvent eventTo(String exchange) {
-        return new TestOutboxEvent(UUID.randomUUID(), exchange, ROUTING_KEY);
+        return new TestOutboxEvent(UUID.randomUUID(), Instant.now(), exchange, ROUTING_KEY);
     }
 
     private void publishInTransaction(DomainEvent event) {

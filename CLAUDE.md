@@ -107,14 +107,24 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   Delivery is at-least-once.
 - Order: rows are sent by `sequence_number` (insertion order), which is stable within one transaction.
   Across concurrent transactions it is not commit order, so consumers must not rely on global ordering.
-- Consuming: handlers annotated `@Idempotent` are deduplicated by inserting `event_id` into
-  `processed_event` (`ON CONFLICT DO NOTHING`) in the same transaction as the handler's effect.
+- Consuming: every consumer has its own queue bound to the producer's exchange and its own
+  `@RabbitListener`, which wraps the effect in `IdempotentConsumer.runOnce(eventId, consumer, effect)`.
+  It inserts `(event_id, consumer)` into `processed_event` (`ON CONFLICT DO NOTHING`) and runs the effect
+  in the same transaction only if the row was inserted. The consumer name is the queue name.
+- Event contract: `DomainEvent` carries `eventId` and `occurredAt`; exchange and routing key are not part
+  of the payload. Changes must be backward compatible (only add fields; consumers ignore unknown ones).
+  A breaking change means a new event type.
+- Queues, exchanges and bindings are a `Declarables` bean declared on the first broker connection, so the
+  application starts without RabbitMQ and listeners connect once the broker is available.
 - Every configured queue gets a dead-letter queue `<queue>.dlq` (via exchange `cm.dlx`); messages
   matching no binding go to `cm.unroutable.queue` (alternate exchange `cm.unroutable`).
 - RabbitMQ cannot change arguments of an existing queue/exchange (`PRECONDITION_FAILED`). After changing
   them, delete the queue/exchange in the local broker once (management UI: http://localhost:15672).
-- The relay scheduler is disabled in tests (`cm-app/src/test/resources/config/application.yaml`);
-  tests call `OutboxRelay.publishPendingEvents()` directly.
+- Retention: `MessagingRetention` deletes published `outbox_event` rows after 7 days and `processed_event`
+  rows after 30 days (`messaging.retention.*`). The `processed_event` TTL must stay far longer than any
+  possible redelivery, otherwise a late duplicate is processed again.
+- The relay and retention schedulers are disabled in tests (`cm-app/src/test/resources/config/application.yaml`);
+  tests call `OutboxRelay.publishPendingEvents()` and `MessagingRetention.deleteExpiredRows()` directly.
 
 ## Security
 - Realm roles: `CANDIDATE`, `RECRUITER` (`UserRole` in `cm-auth`). Users register themselves through
@@ -133,14 +143,8 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   data of their own job offers once those exist.
 - Registration endpoints have no rate limiting.
 - `CandidateCreated` listener and handler live in `cm-shared` instead of a domain module.
-- `DynamicRabbitConfig` declares queues eagerly in `@PostConstruct`, so the application
-  (and every Spring Boot test) cannot start without a running RabbitMQ broker.
-- Outbox: published rows are never deleted (no cleanup job).
 - Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider
   more relay instances, batched confirms or correlated confirms.
-- `processed_event` is keyed by `event_id` only and `EventHandlerRegistry` keeps one handler per event
-  type (a second one silently overrides the first). Supporting several consumers of one event needs
-  a `(event_id, consumer)` key.
 - Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling.

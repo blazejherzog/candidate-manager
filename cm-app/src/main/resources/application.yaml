@@ -53,3 +53,11 @@ outbox:
     fixed-delay: 1000
     batch-size: 50
     confirm-timeout: 5000
+
+messaging:
+  retention:
+    enabled: true
+    fixed-delay: PT1H
+    published-outbox-event-ttl: 7d
+    processed-event-ttl: 30d
+    batch-size: 1000
