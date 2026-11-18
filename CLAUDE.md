@@ -111,6 +111,11 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   `@RabbitListener`, which wraps the effect in `IdempotentConsumer.runOnce(eventId, consumer, effect)`.
   It inserts `(event_id, consumer)` into `processed_event` (`ON CONFLICT DO NOTHING`) and runs the effect
   in the same transaction only if the row was inserted. The consumer name is the queue name.
+- Naming: one topic exchange per producing module (`cm.<module>`, e.g. `cm.auth`), routing key
+  `<module>.<event>` (e.g. `auth.candidate-registered`), one queue per consumer
+  `<consumer-module>.<event>` (e.g. `cm-candidate.candidate-registered`), configured in `rabbitmq.queues`.
+- Events exchanged between modules (contracts) live in `cm-shared` (`com.candidate_manager.shared.event`),
+  because domain modules must not depend on each other. Their `toString()` must not expose personal data.
 - Event contract: `DomainEvent` carries `eventId` and `occurredAt`; exchange and routing key are not part
   of the payload. Changes must be backward compatible (only add fields; consumers ignore unknown ones).
   A breaking change means a new event type.
@@ -120,6 +125,8 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   matching no binding go to `cm.unroutable.queue` (alternate exchange `cm.unroutable`).
 - RabbitMQ cannot change arguments of an existing queue/exchange (`PRECONDITION_FAILED`). After changing
   them, delete the queue/exchange in the local broker once (management UI: http://localhost:15672).
+  Queues removed from the configuration (e.g. `candidate.created.queue`, `candidate.exchange`) are not
+  deleted automatically either; remove them there.
 - Retention: `MessagingRetention` deletes published `outbox_event` rows after 7 days and `processed_event`
   rows after 30 days (`messaging.retention.*`). The `processed_event` TTL must stay far longer than any
   possible redelivery, otherwise a late duplicate is processed again.
@@ -134,15 +141,17 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   Keycloak 26.8 requires the `kc-admin-api` client scope) and `cm-web` (public; user login).
 - The API accepts only tokens with audience `cm-backend`. `realm_access.roles` are mapped to `ROLE_<name>`,
   so use `@PreAuthorize("hasRole('RECRUITER')")`. All endpoints except registration require a token.
-- Registration is not transactional across Keycloak calls: if assigning the role fails, the created user
-  is deleted again (`UserService`).
+- Registration is not transactional across Keycloak calls: if assigning the role or storing the
+  `CandidateRegisteredEvent` in the outbox fails, the created user is deleted again (`UserService`).
+- Candidate registration publishes `CandidateRegisteredEvent`; `cm-candidate` consumes it and creates the
+  candidate profile (`candidate`, linked to the Keycloak user by the unique `user_id`). Recruiter
+  registration publishes no event yet.
 - Errors are returned as `ProblemDetail` (`spring.mvc.problemdetails.enabled`).
 
 ## Known technical debt
 - Anyone can register as `RECRUITER` (no email verification or approval). Recruiters must only see
   data of their own job offers once those exist.
 - Registration endpoints have no rate limiting.
-- `CandidateCreated` listener and handler live in `cm-shared` instead of a domain module.
 - Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider

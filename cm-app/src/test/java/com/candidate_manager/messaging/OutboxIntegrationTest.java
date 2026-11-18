@@ -1,10 +1,10 @@
 package com.candidate_manager.messaging;
 
 import com.candidate_manager.TestcontainersConfiguration;
-import com.candidate_manager.shared.config.messaging.event.CandidateCreatedEvent;
 import com.candidate_manager.shared.config.messaging.event.DomainEvent;
 import com.candidate_manager.shared.config.messaging.outbox.OutboxRelay;
 import com.candidate_manager.shared.config.messaging.publisher.EventPublisher;
+import com.candidate_manager.shared.event.CandidateRegisteredEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +57,7 @@ class OutboxIntegrationTest {
     void cleanUp() {
         jdbcTemplate.update("DELETE FROM outbox_event");
         jdbcTemplate.update("DELETE FROM processed_event");
+        jdbcTemplate.update("DELETE FROM candidate");
     }
 
     @Test
@@ -112,8 +113,7 @@ class OutboxIntegrationTest {
     @Test
     void storesPayloadWithOccurredAtAndWithoutRoutingDetails() {
         Instant occurredAt = Instant.parse("2026-01-02T03:04:05Z");
-        CandidateCreatedEvent event = new CandidateCreatedEvent(
-                UUID.randomUUID(), occurredAt, "candidate-1", "Jan", "Kowalski", "jan.kowalski@example.com");
+        CandidateRegisteredEvent event = candidateRegisteredEvent(occurredAt);
 
         publishInTransaction(event);
 
@@ -139,8 +139,7 @@ class OutboxIntegrationTest {
 
     @Test
     void deliversEventToIdempotentConsumerEndToEnd() {
-        CandidateCreatedEvent event = new CandidateCreatedEvent(
-                UUID.randomUUID(), Instant.now(), "candidate-1", "Jan", "Kowalski", "jan.kowalski@example.com");
+        CandidateRegisteredEvent event = candidateRegisteredEvent(Instant.now());
         publishInTransaction(event);
 
         assertThat(outboxRelay.publishPendingEvents()).isEqualTo(1);
@@ -274,6 +273,12 @@ class OutboxIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM outbox_event WHERE published_at IS NULL", Integer.class))
                 .isZero();
+    }
+
+    private static CandidateRegisteredEvent candidateRegisteredEvent(Instant occurredAt) {
+        UUID userId = UUID.randomUUID();
+        return new CandidateRegisteredEvent(
+                UUID.randomUUID(), occurredAt, userId, userId + "@example.com", "Jan", "Kowalski");
     }
 
     private TestOutboxEvent eventTo(String exchange) {

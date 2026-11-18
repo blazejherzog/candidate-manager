@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 public class KeycloakTestContainer extends GenericContainer<KeycloakTestContainer> {
 
@@ -75,6 +76,11 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
 
     public boolean userExists(String username) {
         return !adminGet(masterAdminToken(), "/admin/realms/{realm}/users?username={username}&exact=true", REALM, username).isEmpty();
+    }
+
+    public UUID userIdOf(String username) {
+        return UUID.fromString(String.valueOf(adminGet(masterAdminToken(),
+                "/admin/realms/{realm}/users?username={username}&exact=true", REALM, username).get(0).get("id")));
     }
 
     public List<String> realmRolesOf(String username) {

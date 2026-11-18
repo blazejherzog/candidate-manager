@@ -42,9 +42,9 @@ keycloak:
 
 rabbitmq:
   queues:
-    - name: candidate.created.queue
-      exchange: candidate.exchange
-      routing-key: candidate.created
+    - name: cm-candidate.candidate-registered
+      exchange: cm.auth
+      routing-key: auth.candidate-registered
       durable: true
 
 outbox:
