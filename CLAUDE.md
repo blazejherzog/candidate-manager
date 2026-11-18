@@ -6,7 +6,7 @@ the recruitment process (job offers → applications → process stages → deci
 ## Stack
 - Java 21, Spring Boot 3.5.x, Maven (wrapper: `./mvnw`)
 - PostgreSQL 15, Flyway (schema migrations)
-- RabbitMQ (asynchronous messaging), Keycloak (OAuth2/JWT)
+- RabbitMQ (asynchronous messaging), Keycloak 26.8 (OAuth2/JWT)
 - JUnit 5, Testcontainers
 
 ## Architecture: modular monolith
@@ -34,12 +34,26 @@ Rules:
 ## Running locally
 ```bash
 docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ :5672/:15672
+export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → Credentials (admin/admin)
 ./mvnw -pl cm-app -am spring-boot:run
 ./mvnw -DskipTests package           # executable jar: cm-app/target/cm-app-<version>.jar
 ./mvnw test                          # requires running Docker (Testcontainers)
 ./mvnw -pl <module> -am test         # tests for a single module
 ```
-The `cm-realm` realm in Keycloak must be configured manually (no export in the repo).
+- `cm-realm` is imported from `docker-init-keycloak/cm-realm-realm.json` on Keycloak's first start
+  (the file name must be `<realm>-realm.json`). An existing realm is never overwritten: after changing
+  the file, delete the realm in the admin console or remove the `keycloak_pgdata` volume.
+- The `cm-backend` client secret is generated on import and is not stored in the repo. Without
+  `KEYCLOAK_CLIENT_SECRET` the application does not start. Keep the empty default in
+  `${KEYCLOAK_CLIENT_SECRET:}`: an unresolved placeholder would be bound as literal text and pass
+  `@NotBlank`, so a missing secret would only show up as 502 on the first registration.
+- Register and log in (local only; `cm-web` allows the password grant for curl):
+  ```bash
+  curl -X POST localhost:8080/api/auth/register/candidate -H 'Content-Type: application/json' \
+    -d '{"username":"anna","email":"anna@example.com","password":"Secret-pass-1","firstName":"Anna","lastName":"Nowak"}'
+  curl -d grant_type=password -d client_id=cm-web -d username=anna -d password=Secret-pass-1 \
+    localhost:8081/realms/cm-realm/protocol/openid-connect/token
+  ```
 
 ## Database and migrations
 - Schema is managed exclusively by Flyway (`src/main/resources/db/migration`).
@@ -71,7 +85,11 @@ The `cm-realm` realm in Keycloak must be configured manually (no export in the r
 - Never claim tests pass unless they were actually run. Report the real result.
 
 ## Working rules
-- Code, identifiers, comments, and commit messages are in English.
+- Code, identifiers, and commit messages are in English.
+- No comments in code (including Javadoc, YAML and SQL comments). Code must explain itself:
+  precise names for classes, methods, variables, constants and tests; extract a well-named
+  method or constant instead of explaining a block. The "why" behind a non-obvious decision
+  goes into the commit message or this file, not into a comment.
 - Plan first, then implement. Before creating or changing files, present the proposal
   and wait for approval.
 - Make changes locally only and show `git diff` afterwards. **Do not commit or push** —
@@ -98,8 +116,22 @@ The `cm-realm` realm in Keycloak must be configured manually (no export in the r
 - The relay scheduler is disabled in tests (`cm-app/src/test/resources/config/application.yaml`);
   tests call `OutboxRelay.publishPendingEvents()` directly.
 
+## Security
+- Realm roles: `CANDIDATE`, `RECRUITER` (`UserRole` in `cm-auth`). Users register themselves through
+  `POST /api/auth/register/candidate` and `POST /api/auth/register/recruiter`; the role comes from the
+  endpoint, never from the request body.
+- Clients: `cm-backend` (confidential; API audience and service account for the Admin API, which in
+  Keycloak 26.8 requires the `kc-admin-api` client scope) and `cm-web` (public; user login).
+- The API accepts only tokens with audience `cm-backend`. `realm_access.roles` are mapped to `ROLE_<name>`,
+  so use `@PreAuthorize("hasRole('RECRUITER')")`. All endpoints except registration require a token.
+- Registration is not transactional across Keycloak calls: if assigning the role fails, the created user
+  is deleted again (`UserService`).
+- Errors are returned as `ProblemDetail` (`spring.mvc.problemdetails.enabled`).
+
 ## Known technical debt
-- Keycloak `client-secret` stored in `application.yaml` in the repo.
+- Anyone can register as `RECRUITER` (no email verification or approval). Recruiters must only see
+  data of their own job offers once those exist.
+- Registration endpoints have no rate limiting.
 - `CandidateCreated` listener and handler live in `cm-shared` instead of a domain module.
 - `DynamicRabbitConfig` declares queues eagerly in `@PostConstruct`, so the application
   (and every Spring Boot test) cannot start without a running RabbitMQ broker.

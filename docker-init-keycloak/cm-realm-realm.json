@@ -1,0 +1,92 @@
+{
+  "realm": "cm-realm",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "passwordPolicy": "length(8)",
+  "roles": {
+    "realm": [
+      {
+        "name": "CANDIDATE",
+        "description": "Candidate applying for job offers"
+      },
+      {
+        "name": "RECRUITER",
+        "description": "Representative of a company that recruits"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "cm-backend",
+      "name": "Candidate Manager backend",
+      "description": "Confidential client: audience of API access tokens and service account for the Admin API. The secret is generated on import.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": [
+        "basic",
+        "roles",
+        "profile",
+        "email",
+        "web-origins",
+        "acr",
+        "kc-admin-api"
+      ]
+    },
+    {
+      "clientId": "cm-web",
+      "name": "Candidate Manager web",
+      "description": "Public client used by users to log in. Direct access grants are enabled for local development (curl).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "http://localhost:*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "cm-backend-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "cm-backend",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-cm-backend",
+      "enabled": true,
+      "serviceAccountClientId": "cm-backend",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "view-realm"
+        ]
+      }
+    }
+  ]
+}
