@@ -18,6 +18,7 @@ import java.util.UUID;
 public record JobOfferDetails(
         UUID id,
         JobOfferStatus status,
+        boolean expired,
         String title,
         String companyName,
         JobCategory category,
@@ -39,10 +40,11 @@ public record JobOfferDetails(
         Instant updatedAt,
         Instant publishedAt) {
 
-    static JobOfferDetails from(JobOffer offer) {
+    static JobOfferDetails from(JobOffer offer, LocalDate today) {
         return new JobOfferDetails(
                 offer.getId(),
                 offer.getStatus(),
+                offer.isExpired(today),
                 offer.getTitle(),
                 offer.getCompanyName(),
                 offer.getCategory(),

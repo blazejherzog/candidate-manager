@@ -201,6 +201,7 @@ class JobOfferIntegrationTest {
         mockMvc.perform(post(JOB_OFFERS + "/" + offerId + "/publish").with(recruiter(recruiterId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.expired").value(false))
                 .andExpect(jsonPath("$.validUntil").value(LocalDate.now(businessClock).plusDays(30).toString()))
                 .andExpect(jsonPath("$.publishedAt").exists());
 

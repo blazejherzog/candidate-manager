@@ -3,15 +3,18 @@ package com.candidate_manager.job.web;
 import com.candidate_manager.job.application.JobOfferDetails;
 import com.candidate_manager.job.application.JobOfferService;
 import com.candidate_manager.job.application.JobOfferSummaryPage;
+import com.candidate_manager.job.application.PublishedJobOfferPage;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -62,9 +65,17 @@ public class JobOfferController {
         return jobOfferService.publish(id, userIdOf(recruiter));
     }
 
+    @GetMapping("/api/job-offers")
+    public PublishedJobOfferPage findActiveOffers(
+            @Valid @ModelAttribute PublishedJobOfferSearchRequest search,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
+        return jobOfferService.findActiveOffers(search.toCriteria(), page, size);
+    }
+
     @GetMapping("/api/job-offers/{id}")
-    public JobOfferDetails findOffer(@PathVariable("id") UUID id, Principal user) {
-        return jobOfferService.findVisibleOffer(id, userIdOf(user));
+    public JobOfferDetails findOffer(@PathVariable("id") UUID id, @Nullable Principal viewer) {
+        return jobOfferService.findVisibleOffer(id, viewer == null ? null : userIdOf(viewer));
     }
 
     @GetMapping("/api/recruiter/job-offers")

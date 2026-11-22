@@ -95,6 +95,9 @@ docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ 
   precise names for classes, methods, variables, constants and tests; extract a well-named
   method or constant instead of explaining a block. The "why" behind a non-obvious decision
   goes into the commit message or this file, not into a comment.
+- No single-letter or cryptic abbreviated names, in code and in the API (query parameters, JSON fields,
+  paths): use meaningful English words (`keyword`, not `q`; `offer`, not `o`). An exception needs a
+  conscious decision recorded here.
 - Plan first, then implement. Before creating or changing files, present the proposal
   and wait for approval.
 - Make changes locally only and show `git diff` afterwards. **Do not commit or push** —
@@ -145,7 +148,8 @@ docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ 
 - Clients: `cm-backend` (confidential; API audience and service account for the Admin API, which in
   Keycloak 26.8 requires the `kc-admin-api` client scope) and `cm-web` (public; user login).
 - The API accepts only tokens with audience `cm-backend`. `realm_access.roles` are mapped to `ROLE_<name>`,
-  so use `@PreAuthorize("hasRole('RECRUITER')")`. All endpoints except registration require a token.
+  so use `@PreAuthorize("hasRole('RECRUITER')")`. All endpoints except registration and
+  `GET /api/job-offers`, `GET /api/job-offers/{id}` require a token; an invalid token is rejected (401) everywhere.
 - Registration is not transactional across Keycloak calls: if assigning the role or storing the
   `CandidateRegisteredEvent` in the outbox fails, the created user is deleted again (`UserService`).
 - Candidate registration publishes `CandidateRegisteredEvent`; `cm-candidate` consumes it and creates the
@@ -156,8 +160,8 @@ docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ 
   brute force protection locks a user for 60 s (growing up to 15 min) after 5 failed logins.
   Direct access grants on `cm-web` exist only for local curl and must be disabled in production.
 - Errors are returned as `ProblemDetail`. `ApiExceptionHandler` (`cm-app`) adds `errors[]` (`field`, `message`)
-  to validation errors and maps optimistic locking failures to 409; module handlers map only their domain
-  exceptions.
+  to validation errors (request body, query parameters), maps optimistic locking failures to 409 and query or
+  transaction timeouts to 503; module handlers map only their domain exceptions.
 
 ## Time
 - Business dates (`LocalDate`) come from the `Clock` bean in the `app.time-zone` zone (`Europe/Warsaw`), never from
@@ -171,6 +175,19 @@ docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ 
   else gets 404, not 403, so its existence is not revealed. `GET /api/recruiter/job-offers` lists the caller's offers.
 - `validUntil` defaults to the publication date + 30 days and may be at most 60 days ahead; a draft whose
   `validUntil` has passed cannot be published.
+- Expiration is derived from the date, not stored: an offer is active while it is `PUBLISHED` and
+  `validUntil >= today` (business clock, last day inclusive). No scheduler, so visibility changes exactly at midnight
+  and nothing races with publication. An expired offer is visible only to its owner (`expired: true` in responses).
+  Anything that must react to expiration (e.g. closing applications) checks the same condition.
+- Public search `GET /api/job-offers` (no token) lists active offers newest published first. Filters: `keyword` (title or
+  company), `location` (any location), both case-insensitive fragments of 3-100 characters with `%`/`_` matched
+  literally; `category`, `positionLevel`, `workMode`, `employmentTime`, `contractType` accept several values.
+  There is no salary amount filter: currencies and periods differ.
+- Search performance guards: trigram GIN indexes (`pg_trgm`) on `lower(title)`, `lower(company_name)` and
+  `job_offer_locations_search_text(locations)` (an `IMMUTABLE` wrapper, because `array_to_string` cannot be indexed
+  directly; the query must call the same function to use the index), the minimum fragment length (trigrams need 3
+  characters), page size at most 100, `@BatchSize` on salaries, and a 3 s transaction timeout on the search
+  that cancels the SQL query and answers 503.
 - Concurrent publish/change/delete of one offer is resolved by `@Version` (loser gets 409). The version is a `Long`,
   so `save()` persists a new offer (assigned UUID) instead of merging it, which would add a select and a version bump.
 - Text lists are `VARCHAR(n)[]` columns (order kept, element length enforced by the database); salaries and
@@ -184,6 +201,8 @@ docker compose up -d                 # Postgres :5433, Keycloak :8081, RabbitMQ 
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider
   more relay instances, batched confirms or correlated confirms.
 - Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling.
-- Job offers: a published offer past its `validUntil` stays `PUBLISHED` and visible (no expiration yet); there is
-  no public listing or search of published offers; "at least one salary" is enforced only by request validation,
-  because it spans two tables.
+- Job offers: "at least one salary" is enforced only by request validation, because it spans two tables.
+- Job offers: expiration is only derived from the date (see `cm-job`). When a module has to react to it (notify
+  applicants, close the recruitment process), add an `EXPIRED` status set by a scheduler that publishes a
+  `JobOfferExpiredEvent` through the outbox; keep the date condition in queries so visibility stays exact.
+- Job offers: recruiters cannot close an offer before its `validUntil` yet.

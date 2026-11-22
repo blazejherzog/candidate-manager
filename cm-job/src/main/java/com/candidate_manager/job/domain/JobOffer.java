@@ -13,6 +13,7 @@ import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -69,6 +70,7 @@ public class JobOffer {
     private List<String> locations;
 
     @ElementCollection
+    @BatchSize(size = 100)
     @CollectionTable(name = "job_offer_salary", joinColumns = @JoinColumn(name = "job_offer_id"))
     private List<Salary> salaries = new ArrayList<>();
 
@@ -153,8 +155,16 @@ public class JobOffer {
         }
     }
 
-    public boolean isVisibleTo(UUID userId) {
-        return status == JobOfferStatus.PUBLISHED || recruiterId.equals(userId);
+    public boolean isVisibleTo(UUID userId, LocalDate today) {
+        return isActive(today) || recruiterId.equals(userId);
+    }
+
+    public boolean isActive(LocalDate today) {
+        return status == JobOfferStatus.PUBLISHED && !validUntil.isBefore(today);
+    }
+
+    public boolean isExpired(LocalDate today) {
+        return status == JobOfferStatus.PUBLISHED && validUntil.isBefore(today);
     }
 
     private void applyContent(JobOfferContent content) {
