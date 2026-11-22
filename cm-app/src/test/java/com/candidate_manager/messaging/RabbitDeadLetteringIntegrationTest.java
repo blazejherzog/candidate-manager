@@ -37,8 +37,8 @@ class RabbitDeadLetteringIntegrationTest {
         rabbitAdmin.purgeQueue(CANDIDATE_REGISTERED_DEAD_LETTER_QUEUE, false);
         String messageId = UUID.randomUUID().toString();
 
-        // Invalid JSON: the listener fails on every retry attempt, then the message is rejected.
-        rabbitTemplate.send(AUTH_EXCHANGE, CANDIDATE_REGISTERED_ROUTING_KEY, jsonMessage(messageId, "not a json"));
+        String bodyFailingEveryRetry = "not a json";
+        rabbitTemplate.send(AUTH_EXCHANGE, CANDIDATE_REGISTERED_ROUTING_KEY, jsonMessage(messageId, bodyFailingEveryRetry));
 
         Message deadLettered = rabbitTemplate.receive(CANDIDATE_REGISTERED_DEAD_LETTER_QUEUE, 15_000);
         assertThat(deadLettered).isNotNull();

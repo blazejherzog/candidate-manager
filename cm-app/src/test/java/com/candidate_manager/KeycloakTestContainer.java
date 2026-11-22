@@ -2,6 +2,7 @@ package com.candidate_manager;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -64,6 +65,34 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
         form.add("username", username);
         form.add("password", password);
         return token(REALM, form);
+    }
+
+    public HttpStatusCode passwordLoginStatus(String username, String password) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "password");
+        form.add("client_id", "cm-web");
+        form.add("username", username);
+        form.add("password", password);
+        return client().post()
+                .uri("/realms/{realm}/protocol/openid-connect/token", REALM)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .exchange((request, response) -> response.getStatusCode());
+    }
+
+    public HttpStatusCode updateOwnAccount(String userToken, Map<String, Object> account) {
+        return client().post()
+                .uri("/realms/{realm}/account", REALM)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(account)
+                .exchange((request, response) -> response.getStatusCode());
+    }
+
+    public Map<String, Object> userRepresentationOf(String username) {
+        return adminGet(masterAdminToken(), "/admin/realms/{realm}/users?username={username}&exact=true", REALM, username)
+                .get(0);
     }
 
     public String backendServiceAccountTokenWithoutApiAudience() {

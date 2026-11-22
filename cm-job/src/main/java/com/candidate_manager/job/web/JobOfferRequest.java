@@ -2,7 +2,6 @@ package com.candidate_manager.job.web;
 
 import com.candidate_manager.job.domain.EmploymentTime;
 import com.candidate_manager.job.domain.JobCategory;
-import com.candidate_manager.job.domain.JobOffer;
 import com.candidate_manager.job.domain.JobOfferContent;
 import com.candidate_manager.job.domain.PositionLevel;
 import com.candidate_manager.job.domain.WorkMode;
@@ -37,7 +36,7 @@ public record JobOfferRequest(
         @Size(max = 10) List<@NotNull @Valid LanguageRequirementRequest> languages,
         @Size(max = 10) List<@NotBlank @Size(max = 500) String> recruitmentSteps,
         @FutureOrPresent LocalDate startDate,
-        @Future LocalDate validUntil) {
+        @Future @WithinMaxValidity LocalDate validUntil) {
 
     @AssertTrue(message = "locations are required unless workMode is REMOTE")
     boolean isLocationGivenUnlessRemote() {
@@ -52,11 +51,6 @@ public record JobOfferRequest(
     @AssertTrue(message = "each language may be listed only once")
     boolean isEachLanguageListedOnce() {
         return hasNoDuplicates(languages, LanguageRequirementRequest::language);
-    }
-
-    @AssertTrue(message = "validUntil must be at most 60 days from today")
-    boolean isValidUntilWithinMaxValidity() {
-        return validUntil == null || !validUntil.isAfter(LocalDate.now().plus(JobOffer.MAX_VALIDITY));
     }
 
     JobOfferContent toContent() {

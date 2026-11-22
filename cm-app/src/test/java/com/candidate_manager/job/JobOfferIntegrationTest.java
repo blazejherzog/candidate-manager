@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -56,6 +57,9 @@ class JobOfferIntegrationTest {
 
     @Autowired
     private KeycloakTestContainer keycloak;
+
+    @Autowired
+    private Clock businessClock;
 
     @Test
     void createsDraftOwnedByRecruiter() throws Exception {
@@ -147,11 +151,11 @@ class JobOfferIntegrationTest {
     @Test
     void rejectsValidUntilLaterThanSixtyDaysFromToday() throws Exception {
         Map<String, Object> request = validOfferRequest();
-        request.put("validUntil", LocalDate.now().plusDays(61).toString());
+        request.put("validUntil", LocalDate.now(businessClock).plusDays(61).toString());
 
         createDraft(UUID.randomUUID(), request)
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[*].field", hasItem("validUntilWithinMaxValidity")));
+                .andExpect(jsonPath("$.errors[*].field", hasItem("validUntil")));
     }
 
     @Test
@@ -197,7 +201,7 @@ class JobOfferIntegrationTest {
         mockMvc.perform(post(JOB_OFFERS + "/" + offerId + "/publish").with(recruiter(recruiterId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PUBLISHED"))
-                .andExpect(jsonPath("$.validUntil").value(LocalDate.now().plusDays(30).toString()))
+                .andExpect(jsonPath("$.validUntil").value(LocalDate.now(businessClock).plusDays(30).toString()))
                 .andExpect(jsonPath("$.publishedAt").exists());
 
         mockMvc.perform(get(JOB_OFFERS + "/" + offerId).with(candidate(UUID.randomUUID())))
@@ -208,7 +212,7 @@ class JobOfferIntegrationTest {
     @Test
     void keepsValidUntilChosenByRecruiterWhenPublishing() throws Exception {
         UUID recruiterId = UUID.randomUUID();
-        String validUntil = LocalDate.now().plusDays(45).toString();
+        String validUntil = LocalDate.now(businessClock).plusDays(45).toString();
         Map<String, Object> request = validOfferRequest();
         request.put("validUntil", validUntil);
         UUID offerId = createDraftOf(recruiterId, request);
@@ -222,7 +226,7 @@ class JobOfferIntegrationTest {
     void rejectsPublishingDraftWhoseValidUntilHasPassed() throws Exception {
         UUID recruiterId = UUID.randomUUID();
         Map<String, Object> request = validOfferRequest();
-        request.put("validUntil", LocalDate.now().plusDays(10).toString());
+        request.put("validUntil", LocalDate.now(businessClock).plusDays(10).toString());
         UUID offerId = createDraftOf(recruiterId, request);
         jdbcTemplate.update("UPDATE job_offer SET valid_until = current_date - 1 WHERE id = ?", offerId);
 

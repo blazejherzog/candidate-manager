@@ -36,8 +36,7 @@ import static org.awaitility.Awaitility.await;
 @Import(TestcontainersConfiguration.class)
 class OutboxIntegrationTest {
 
-    // Built into every RabbitMQ broker, so the broker accepts and confirms messages sent to it.
-    private static final String EXISTING_EXCHANGE = "amq.topic";
+    private static final String EXCHANGE_BUILT_INTO_EVERY_BROKER = "amq.topic";
     private static final String MISSING_EXCHANGE = "test.missing.exchange";
     private static final String ROUTING_KEY = "test.outbox";
 
@@ -62,7 +61,7 @@ class OutboxIntegrationTest {
 
     @Test
     void storesEventInOutboxWhenTransactionCommits() {
-        TestOutboxEvent event = eventTo(EXISTING_EXCHANGE);
+        TestOutboxEvent event = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
 
         publishInTransaction(event);
 
@@ -71,7 +70,7 @@ class OutboxIntegrationTest {
                         + "FROM outbox_event WHERE id = ?",
                 event.eventId());
         assertThat(row.get("event_type")).isEqualTo(TestOutboxEvent.class.getName());
-        assertThat(row.get("exchange")).isEqualTo(EXISTING_EXCHANGE);
+        assertThat(row.get("exchange")).isEqualTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
         assertThat(row.get("routing_key")).isEqualTo(ROUTING_KEY);
         assertThat((String) row.get("payload")).contains(event.eventId().toString());
         assertThat(row.get("published_at")).isNull();
@@ -79,7 +78,7 @@ class OutboxIntegrationTest {
 
     @Test
     void leavesNoOutboxEventWhenTransactionRollsBack() {
-        TestOutboxEvent event = eventTo(EXISTING_EXCHANGE);
+        TestOutboxEvent event = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
 
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
             eventPublisher.publish(event);
@@ -91,7 +90,7 @@ class OutboxIntegrationTest {
 
     @Test
     void rejectsPublishingOutsideTransaction() {
-        assertThatThrownBy(() -> eventPublisher.publish(eventTo(EXISTING_EXCHANGE)))
+        assertThatThrownBy(() -> eventPublisher.publish(eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER)))
                 .isInstanceOf(IllegalTransactionStateException.class);
 
         assertThat(countOutboxEvents()).isZero();
@@ -100,14 +99,14 @@ class OutboxIntegrationTest {
     @Test
     void rejectsDuplicateEventIdWithoutOverwritingStoredEvent() {
         UUID eventId = UUID.randomUUID();
-        publishInTransaction(new TestOutboxEvent(eventId, Instant.now(), EXISTING_EXCHANGE, ROUTING_KEY));
+        publishInTransaction(new TestOutboxEvent(eventId, Instant.now(), EXCHANGE_BUILT_INTO_EVERY_BROKER, ROUTING_KEY));
 
         assertThatThrownBy(() -> publishInTransaction(new TestOutboxEvent(eventId, Instant.now(), MISSING_EXCHANGE, ROUTING_KEY)))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
         assertThat(countOutboxEvents()).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("SELECT exchange FROM outbox_event WHERE id = ?", String.class, eventId))
-                .isEqualTo(EXISTING_EXCHANGE);
+                .isEqualTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
     }
 
     @Test
@@ -128,7 +127,7 @@ class OutboxIntegrationTest {
 
     @Test
     void relayPublishesPendingEventAndMarksItPublished() {
-        TestOutboxEvent event = eventTo(EXISTING_EXCHANGE);
+        TestOutboxEvent event = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
         publishInTransaction(event);
 
         int published = outboxRelay.publishPendingEvents();
@@ -163,29 +162,26 @@ class OutboxIntegrationTest {
 
     @Test
     void keepsEventsSentBeforeFailureMarkedAndDoesNotResendThem() {
-        TestOutboxEvent sentEvent = eventTo(EXISTING_EXCHANGE);
-        TestOutboxEvent failingEvent = eventTo(MISSING_EXCHANGE);
-        // Stored after sentEvent, so it gets a higher sequence_number and is sent second.
+        TestOutboxEvent sentEvent = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
+        TestOutboxEvent failingEventStoredLater = eventTo(MISSING_EXCHANGE);
         publishInTransaction(sentEvent);
-        publishInTransaction(failingEvent);
+        publishInTransaction(failingEventStoredLater);
 
         assertThat(outboxRelay.publishPendingEvents()).isEqualTo(1);
         Timestamp firstPublishedAt = publishedAt(sentEvent);
         assertThat(firstPublishedAt).isNotNull();
-        assertThat(publishedAt(failingEvent)).isNull();
+        assertThat(publishedAt(failingEventStoredLater)).isNull();
 
         assertThat(outboxRelay.publishPendingEvents()).isZero();
         assertThat(publishedAt(sentEvent)).isEqualTo(firstPublishedAt);
-        assertThat(publishedAt(failingEvent)).isNull();
+        assertThat(publishedAt(failingEventStoredLater)).isNull();
     }
 
     @Test
-    void sendsEventsStoredInOneTransactionInInsertionOrder() {
-        // Events stored in one transaction share created_at (now() is the transaction start time),
-        // so only sequence_number decides that the failing event is sent first and stops the batch.
+    void sendsEventsStoredInOneTransactionAndSharingCreatedAtInInsertionOrder() {
         TestOutboxEvent failingEvent = eventTo(MISSING_EXCHANGE);
         List<TestOutboxEvent> laterEvents = List.of(
-                eventTo(EXISTING_EXCHANGE), eventTo(EXISTING_EXCHANGE), eventTo(EXISTING_EXCHANGE));
+                eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER), eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER), eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER));
         transactionTemplate.executeWithoutResult(status -> {
             eventPublisher.publish(failingEvent);
             laterEvents.forEach(eventPublisher::publish);
@@ -198,8 +194,8 @@ class OutboxIntegrationTest {
 
     @Test
     void relaySkipsEventLockedByAnotherTransaction() throws Exception {
-        TestOutboxEvent lockedEvent = eventTo(EXISTING_EXCHANGE);
-        TestOutboxEvent freeEvent = eventTo(EXISTING_EXCHANGE);
+        TestOutboxEvent lockedEvent = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
+        TestOutboxEvent freeEvent = eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER);
         publishInTransaction(lockedEvent);
         publishInTransaction(freeEvent);
 
@@ -207,8 +203,7 @@ class OutboxIntegrationTest {
         CountDownLatch releaseLock = new CountDownLatch(1);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            // Holds a row lock on lockedEvent in its own transaction, as another relay instance would.
-            Future<?> lockHolder = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+            Future<?> anotherRelayHoldingRowLock = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
                 jdbcTemplate.queryForObject(
                         "SELECT id FROM outbox_event WHERE id = ? FOR UPDATE", UUID.class, lockedEvent.eventId());
                 rowLocked.countDown();
@@ -224,7 +219,7 @@ class OutboxIntegrationTest {
             int publishedWhileLocked = outboxRelay.publishPendingEvents();
 
             releaseLock.countDown();
-            lockHolder.get(10, TimeUnit.SECONDS);
+            anotherRelayHoldingRowLock.get(10, TimeUnit.SECONDS);
 
             assertThat(publishedWhileLocked).isEqualTo(1);
         } finally {
@@ -243,7 +238,7 @@ class OutboxIntegrationTest {
     void concurrentRelaysPublishEachEventExactlyOnce() throws Exception {
         int eventCount = 20;
         for (int i = 0; i < eventCount; i++) {
-            publishInTransaction(eventTo(EXISTING_EXCHANGE));
+            publishInTransaction(eventTo(EXCHANGE_BUILT_INTO_EVERY_BROKER));
         }
 
         CountDownLatch startSignal = new CountDownLatch(1);
@@ -268,7 +263,6 @@ class OutboxIntegrationTest {
             executor.shutdownNow();
         }
 
-        // Without FOR UPDATE SKIP LOCKED both relays would send the same rows and the sum would exceed eventCount.
         assertThat(totalPublished).isEqualTo(eventCount);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM outbox_event WHERE published_at IS NULL", Integer.class))

@@ -15,7 +15,7 @@ Single deployable artifact (`cm-app`), split into Maven modules by domain:
 | Module | Responsibility |
 |---|---|
 | `cm-app` | Entry point, security configuration, `application.yaml` |
-| `cm-shared` | Shared infrastructure: messaging (publisher, dispatcher, idempotency), Keycloak/WebClient config |
+| `cm-shared` | Shared infrastructure: messaging (outbox, `IdempotentConsumer`, retention), Keycloak config, business `Clock` |
 | `cm-auth` | Registration and users (Keycloak Admin API) |
 | `cm-candidate` | Candidates |
 | `cm-job` | Job offers |
@@ -40,6 +40,8 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
 ./mvnw test                          # requires running Docker (Testcontainers)
 ./mvnw -pl <module> -am test         # tests for a single module
 ```
+- SQL logging is off by default; enable it locally with `--logging.level.org.hibernate.SQL=debug`.
+- `spring.jpa.open-in-view` is disabled: map entities to responses inside the transactional service method.
 - `cm-realm` is imported from `docker-init-keycloak/cm-realm-realm.json` on Keycloak's first start
   (the file name must be `<realm>-realm.json`). An existing realm is never overwritten: after changing
   the file, delete the realm in the admin console or remove the `keycloak_pgdata` volume.
@@ -68,7 +70,7 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   `SELECT ... FOR UPDATE`, or a unique constraint, depending on the case. Justify the choice.
 - "Check, then write" without a lock or constraint is a bug (race condition).
 - Event consumers must be idempotent. Marking an event as processed and the handler's effect
-  happen in one transaction, protected by a unique `event_id` key.
+  happen in one transaction, protected by a unique `(event_id, consumer)` key.
 - Publishing events after a state change: transactional outbox or publish after commit.
   Never send a message inside a transaction that may roll back.
 
@@ -146,7 +148,18 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
 - Candidate registration publishes `CandidateRegisteredEvent`; `cm-candidate` consumes it and creates the
   candidate profile (`candidate`, linked to the Keycloak user by the unique `user_id`). Recruiter
   registration publishes no event yet.
-- Errors are returned as `ProblemDetail` (`spring.mvc.problemdetails.enabled`).
+- Realm hardening (`cm-realm-realm.json`): users cannot change their email in the Keycloak account console
+  (declarative user profile, email editable by `admin` only), because `candidate.email` is a unique copy of it;
+  brute force protection locks a user for 60 s (growing up to 15 min) after 5 failed logins.
+  Direct access grants on `cm-web` exist only for local curl and must be disabled in production.
+- Errors are returned as `ProblemDetail`. `ApiExceptionHandler` (`cm-app`) adds `errors[]` (`field`, `message`)
+  to validation errors and maps optimistic locking failures to 409; module handlers map only their domain
+  exceptions.
+
+## Time
+- Business dates (`LocalDate`) come from the `Clock` bean in the `app.time-zone` zone (`Europe/Warsaw`), never from
+  `LocalDate.now()` without a clock. Bean Validation (`@Future`, custom constraints via `ClockProvider`) uses the
+  same clock. `Instant` values do not depend on the zone.
 
 ## Job offers (`cm-job`)
 - A recruiter creates an offer as `DRAFT` (`POST /api/job-offers`), may change (`PUT /api/job-offers/{id}`) or
@@ -159,11 +172,9 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   so `save()` persists a new offer (assigned UUID) instead of merging it, which would add a select and a version bump.
 - Text lists are `VARCHAR(n)[]` columns (order kept, element length enforced by the database); salaries and
   languages are tables keyed by `(job_offer_id, contract_type)` and `(job_offer_id, language)`.
-- Modules are compiled without `-parameters`, so `@PathVariable` and `@RequestParam` need explicit names.
 
 ## Known technical debt
-- Anyone can register as `RECRUITER` (no email verification or approval). Recruiters must only see
-  data of their own job offers once those exist.
+- Anyone can register as `RECRUITER` (no email verification or approval).
 - Registration endpoints have no rate limiting.
 - Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.

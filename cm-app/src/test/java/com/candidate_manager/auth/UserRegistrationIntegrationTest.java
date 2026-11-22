@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -114,7 +115,8 @@ class UserRegistrationIntegrationTest {
 
         mockMvc.perform(post(CANDIDATE_ENDPOINT).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400));
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errors[*].field", hasItems("email", "password", "firstName")));
     }
 
     @Test

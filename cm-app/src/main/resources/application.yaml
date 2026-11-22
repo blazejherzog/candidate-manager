@@ -1,6 +1,9 @@
 server:
   port: 8080
 
+app:
+  time-zone: Europe/Warsaw
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5433/customer_manager
@@ -8,12 +11,9 @@ spring:
     password: password
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        show_sql: true
-        format_sql: true
   security:
     oauth2:
       resourceserver:

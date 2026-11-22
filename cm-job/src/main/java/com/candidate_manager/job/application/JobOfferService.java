@@ -9,6 +9,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class JobOfferService {
 
     private final JobOfferRepository jobOfferRepository;
+    private final Clock businessClock;
 
     @Transactional
     public JobOfferDetails createDraft(UUID recruiterId, JobOfferContent content) {
@@ -45,7 +47,7 @@ public class JobOfferService {
     @Transactional
     public JobOfferDetails publish(UUID jobOfferId, UUID recruiterId) {
         JobOffer offer = findOwnedOffer(jobOfferId, recruiterId);
-        offer.publish(LocalDate.now(), Instant.now());
+        offer.publish(LocalDate.now(businessClock), Instant.now());
         log.info("Recruiter {} published job offer {} valid until {}", recruiterId, jobOfferId, offer.getValidUntil());
         return JobOfferDetails.from(offer);
     }
