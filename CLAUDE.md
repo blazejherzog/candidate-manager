@@ -148,6 +148,19 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
   registration publishes no event yet.
 - Errors are returned as `ProblemDetail` (`spring.mvc.problemdetails.enabled`).
 
+## Job offers (`cm-job`)
+- A recruiter creates an offer as `DRAFT` (`POST /api/job-offers`), may change (`PUT /api/job-offers/{id}`) or
+  delete it, and publishes it (`POST /api/job-offers/{id}/publish`). A published offer can no longer be changed (409).
+- The owner (`recruiter_id`) is the JWT `sub`, never a request field. A draft is visible only to its owner; anyone
+  else gets 404, not 403, so its existence is not revealed. `GET /api/recruiter/job-offers` lists the caller's offers.
+- `validUntil` defaults to the publication date + 30 days and may be at most 60 days ahead; a draft whose
+  `validUntil` has passed cannot be published.
+- Concurrent publish/change/delete of one offer is resolved by `@Version` (loser gets 409). The version is a `Long`,
+  so `save()` persists a new offer (assigned UUID) instead of merging it, which would add a select and a version bump.
+- Text lists are `VARCHAR(n)[]` columns (order kept, element length enforced by the database); salaries and
+  languages are tables keyed by `(job_offer_id, contract_type)` and `(job_offer_id, language)`.
+- Modules are compiled without `-parameters`, so `@PathVariable` and `@RequestParam` need explicit names.
+
 ## Known technical debt
 - Anyone can register as `RECRUITER` (no email verification or approval). Recruiters must only see
   data of their own job offers once those exist.
@@ -157,3 +170,6 @@ export KEYCLOAK_CLIENT_SECRET=...    # cm-realm → Clients → cm-backend → C
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider
   more relay instances, batched confirms or correlated confirms.
 - Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling.
+- Job offers: a published offer past its `validUntil` stays `PUBLISHED` and visible (no expiration yet); there is
+  no public listing or search of published offers; "at least one salary" is enforced only by request validation,
+  because it spans two tables.
