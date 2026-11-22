@@ -129,6 +129,9 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <skip>false</skip>
+                    <profiles>
+                        <profile>local</profile>
+                    </profiles>
                 </configuration>
                 <executions>
                     <execution>

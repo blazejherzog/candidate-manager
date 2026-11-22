@@ -30,11 +30,12 @@
     {
       "clientId": "cm-backend",
       "name": "Candidate Manager backend",
-      "description": "Confidential client: audience of API access tokens and service account for the Admin API. The secret is generated on import.",
+      "description": "Confidential client: audience of API access tokens and service account for the Admin API. The secret is fixed for local development only; production uses its own secret.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
+      "secret": "cm-backend-local-dev-secret",
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,

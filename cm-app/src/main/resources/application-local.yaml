@@ -1,0 +1,2 @@
+keycloak:
+  client-secret: cm-backend-local-dev-secret
