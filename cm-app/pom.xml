@@ -74,6 +74,10 @@
         </dependency>
         <dependency>
             <groupId>com.candidate-manager</groupId>
+            <artifactId>cm-application</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.candidate-manager</groupId>
             <artifactId>cm-resume</artifactId>
         </dependency>
         <dependency>

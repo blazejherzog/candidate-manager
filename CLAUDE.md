@@ -19,6 +19,7 @@ Single deployable artifact (`cm-app`), split into Maven modules by domain:
 | `cm-auth` | Registration and users (Keycloak Admin API) |
 | `cm-candidate` | Candidates |
 | `cm-job` | Job offers |
+| `cm-application` | Job applications (candidate applies, recruiter decides) |
 | `cm-resume` | Candidate resumes |
 | `cm-event` | Recruitment process events |
 | `cm-integration` | External integrations |
@@ -26,7 +27,7 @@ Single deployable artifact (`cm-app`), split into Maven modules by domain:
 Rules:
 - No splitting into microservices. Module boundaries are package and Maven dependency boundaries.
 - Domain modules depend only on `cm-shared`, not on each other. Cross-module communication
-  goes through events or narrow application interfaces.
+  goes through events or narrow interfaces in `com.candidate_manager.shared.directory`, implemented by the owning module.
 - Package layout within a module: `web` / `application` / `domain` / `infrastructure`
   (as in `cm-auth`).
 - Domain-specific code (event listeners, handlers) belongs in its domain module, not in `cm-shared`.
@@ -54,6 +55,7 @@ Loaded when working on matching files (`paths` in each file):
 - `local-environment.md`: Keycloak realm import, local secret, SQL logging, curl login.
 - `candidates.md`: `cm-candidate` profile, name ownership, lost update detection.
 - `job-offers.md`: `cm-job` lifecycle, visibility, expiration, public search and its performance guards.
+- `job-applications.md`: `cm-application` statuses, uniqueness, visibility, reading other modules.
 
 A new domain module gets its own rule file scoped to its paths.
 
@@ -70,4 +72,7 @@ A new domain module gets its own rule file scoped to its paths.
 - Job offers: expiration is only derived from the date (see `cm-job`). When a module has to react to it (notify
   applicants, close the recruitment process), add an `EXPIRED` status set by a scheduler that publishes a
   `JobOfferExpiredEvent` through the outbox; keep the date condition in queries so visibility stays exact.
-- Job offers: recruiters cannot close an offer before its `validUntil` yet.
+- Job offers: recruiters cannot close an offer before its `validUntil` yet. When they can, applying must lock the offer
+  row (e.g. `FOR SHARE` in `JobOfferDirectory`), otherwise an application may be stored after closing.
+- Job applications: offers have no vacancy limit; adding one requires a lock or constraint for concurrent hiring.
+- Job applications: changes made before the process history (`cm-event`) exists are not recorded as events.

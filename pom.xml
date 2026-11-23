@@ -17,6 +17,7 @@
 		<module>cm-auth</module>
 		<module>cm-candidate</module>
 		<module>cm-job</module>
+		<module>cm-application</module>
 		<module>cm-resume</module>
 		<module>cm-event</module>
 		<module>cm-integration</module>
@@ -48,6 +49,11 @@
 			<dependency>
 				<groupId>com.candidate-manager</groupId>
 				<artifactId>cm-job</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.candidate-manager</groupId>
+				<artifactId>cm-application</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
