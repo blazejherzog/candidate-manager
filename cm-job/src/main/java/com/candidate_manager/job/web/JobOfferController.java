@@ -32,6 +32,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JobOfferController {
 
+    private static final int MAX_PAGE_NUMBER = 10_000;
+
     private final JobOfferService jobOfferService;
 
     @PostMapping("/api/job-offers")
@@ -68,7 +70,7 @@ public class JobOfferController {
     @GetMapping("/api/job-offers")
     public PublishedJobOfferPage findActiveOffers(
             @Valid @ModelAttribute PublishedJobOfferSearchRequest search,
-            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) @Max(MAX_PAGE_NUMBER) int page,
             @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size) {
         return jobOfferService.findActiveOffers(search.toCriteria(), page, size);
     }
@@ -81,7 +83,7 @@ public class JobOfferController {
     @GetMapping("/api/recruiter/job-offers")
     @PreAuthorize("hasRole('RECRUITER')")
     public JobOfferSummaryPage findRecruiterOffers(
-            @RequestParam(name = "page", defaultValue = "0") @Min(0) int page,
+            @RequestParam(name = "page", defaultValue = "0") @Min(0) @Max(MAX_PAGE_NUMBER) int page,
             @RequestParam(name = "size", defaultValue = "20") @Min(1) @Max(100) int size,
             Principal recruiter) {
         return jobOfferService.findRecruiterOffers(userIdOf(recruiter), page, size);

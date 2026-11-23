@@ -340,6 +340,14 @@ class JobOfferIntegrationTest {
                 .andExpect(jsonPath("$.status").value(400));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"10001", "2147483647"})
+    void rejectsPageNumberAboveLimit(String page) throws Exception {
+        mockMvc.perform(get(RECRUITER_JOB_OFFERS).with(recruiter(UUID.randomUUID())).param("page", page).param("size", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("page")));
+    }
+
     @Test
     void forbidsCandidateToListRecruiterOffers() throws Exception {
         mockMvc.perform(get(RECRUITER_JOB_OFFERS).with(candidate(UUID.randomUUID())))

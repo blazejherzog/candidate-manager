@@ -23,8 +23,9 @@ paths:
 - Candidate registration publishes `CandidateRegisteredEvent`; `cm-candidate` consumes it and creates the
   candidate profile (`candidate`, linked to the Keycloak user by the unique `user_id`). Recruiter
   registration publishes no event yet.
-- Realm hardening (`cm-realm-realm.json`): users cannot change their email in the Keycloak account console
-  (declarative user profile, email editable by `admin` only), because `candidate.email` is a unique copy of it;
+- Realm hardening (`cm-realm-realm.json`): users cannot change their email, first name or last name in the Keycloak
+  account console (declarative user profile, editable by `admin` only), because `candidate.email` is a unique copy
+  and the candidate profile owns the names; recruiters have no profile yet, so they cannot change their name at all;
   brute force protection locks a user for 60 s (growing up to 15 min) after 5 failed logins.
   Direct access grants on `cm-web` exist only for local curl and must be disabled in production.
 - Errors are returned as `ProblemDetail`. `ApiExceptionHandler` (`cm-app`) adds `errors[]` (`field`, `message`)

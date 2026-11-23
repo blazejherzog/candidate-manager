@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,8 +33,27 @@ public class Candidate {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column
+    private String city;
+
+    @Column
+    private String headline;
+
+    @Column
+    private String summary;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     public Candidate(UUID userId, String email, String firstName, String lastName) {
         this.id = UUID.randomUUID();
@@ -42,5 +62,20 @@ public class Candidate {
         this.firstName = firstName;
         this.lastName = lastName;
         this.createdAt = Instant.now();
+        this.updatedAt = createdAt;
+    }
+
+    public boolean hasVersion(long expectedVersion) {
+        return version == expectedVersion;
+    }
+
+    public void updateDetails(CandidateDetails details, Instant now) {
+        firstName = details.firstName();
+        lastName = details.lastName();
+        phoneNumber = details.phoneNumber();
+        city = details.city();
+        headline = details.headline();
+        summary = details.summary();
+        updatedAt = now;
     }
 }

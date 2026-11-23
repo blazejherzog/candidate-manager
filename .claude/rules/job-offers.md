@@ -26,6 +26,7 @@ paths:
   directly; the query must call the same function to use the index), the minimum fragment length (trigrams need 3
   characters), page size at most 100, `@BatchSize` on salaries, and a 3 s transaction timeout on the search
   that cancels the SQL query and answers 503.
+- Page number is at most 10 000 on both listings: an offset above `Integer.MAX_VALUE` would end as 500, not 400.
 - Concurrent publish/change/delete of one offer is resolved by `@Version` (loser gets 409). The version is a `Long`,
   so `save()` persists a new offer (assigned UUID) instead of merging it, which would add a select and a version bump.
 - Text lists are `VARCHAR(n)[]` columns (order kept, element length enforced by the database); salaries and

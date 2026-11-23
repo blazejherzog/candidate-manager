@@ -52,6 +52,7 @@ Loaded when working on matching files (`paths` in each file):
 - `messaging.md`: outbox, consumers, RabbitMQ naming and topology, event contracts, retention.
 - `security-and-api.md`: roles, tokens, registration, realm hardening, `ProblemDetail` errors.
 - `local-environment.md`: Keycloak realm import, local secret, SQL logging, curl login.
+- `candidates.md`: `cm-candidate` profile, name ownership, lost update detection.
 - `job-offers.md`: `cm-job` lifecycle, visibility, expiration, public search and its performance guards.
 
 A new domain module gets its own rule file scoped to its paths.
@@ -59,6 +60,7 @@ A new domain module gets its own rule file scoped to its paths.
 ## Known technical debt
 - Anyone can register as `RECRUITER` (no email verification or approval).
 - Registration endpoints have no rate limiting.
+- Recruiters cannot change their own first and last name (no recruiter profile yet).
 - Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider

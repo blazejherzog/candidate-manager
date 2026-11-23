@@ -32,19 +32,36 @@ class RealmUserPolicyIntegrationTest {
     private KeycloakTestContainer keycloak;
 
     @Test
-    void userCanChangeOwnFirstNameInAccountConsole() throws Exception {
+    void userCanSaveUnchangedAccountInAccountConsole() throws Exception {
         String username = registerCandidate();
 
-        keycloak.updateOwnAccount(tokenOf(username), account(username, emailOf(username), "Janusz"));
+        assertThat(keycloak.updateOwnAccount(tokenOf(username), account(username, emailOf(username), "Jan", "Kowalski"))
+                .is2xxSuccessful()).isTrue();
+    }
 
-        assertThat(keycloak.userRepresentationOf(username).get("firstName")).isEqualTo("Janusz");
+    @Test
+    void userCannotChangeOwnFirstNameInAccountConsole() throws Exception {
+        String username = registerCandidate();
+
+        keycloak.updateOwnAccount(tokenOf(username), account(username, emailOf(username), "Janusz", "Kowalski"));
+
+        assertThat(keycloak.userRepresentationOf(username).get("firstName")).isEqualTo("Jan");
+    }
+
+    @Test
+    void userCannotChangeOwnLastNameInAccountConsole() throws Exception {
+        String username = registerCandidate();
+
+        keycloak.updateOwnAccount(tokenOf(username), account(username, emailOf(username), "Jan", "Nowak"));
+
+        assertThat(keycloak.userRepresentationOf(username).get("lastName")).isEqualTo("Kowalski");
     }
 
     @Test
     void userCannotChangeOwnEmailInAccountConsole() throws Exception {
         String username = registerCandidate();
 
-        keycloak.updateOwnAccount(tokenOf(username), account(username, "changed-" + emailOf(username), "Jan"));
+        keycloak.updateOwnAccount(tokenOf(username), account(username, "changed-" + emailOf(username), "Jan", "Kowalski"));
 
         assertThat(keycloak.userRepresentationOf(username).get("email")).isEqualTo(emailOf(username));
     }
@@ -73,8 +90,8 @@ class RealmUserPolicyIntegrationTest {
         return keycloak.loginThroughWebClient(username, PASSWORD);
     }
 
-    private static Map<String, Object> account(String username, String email, String firstName) {
-        return Map.of("username", username, "email", email, "firstName", firstName, "lastName", "Kowalski");
+    private static Map<String, Object> account(String username, String email, String firstName, String lastName) {
+        return Map.of("username", username, "email", email, "firstName", firstName, "lastName", lastName);
     }
 
     private static String emailOf(String username) {

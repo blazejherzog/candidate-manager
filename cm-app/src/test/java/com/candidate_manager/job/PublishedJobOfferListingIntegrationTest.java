@@ -167,6 +167,19 @@ class PublishedJobOfferListingIntegrationTest {
                 .andExpect(jsonPath("$.errors[*].field", hasItem("size")));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"10001", "2147483647"})
+    void rejectsPageNumberAboveLimit(String page) throws Exception {
+        mockMvc.perform(get(JOB_OFFERS).param("page", page).param("size", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("page")));
+    }
+
+    @Test
+    void acceptsHighestAllowedPageNumberWithLargestPageSize() throws Exception {
+        assertThat(foundOfferIds(get(JOB_OFFERS).param("page", "10000").param("size", "100"))).isEmpty();
+    }
+
     @Test
     void pagesActiveOffersNewestPublishedFirst() throws Exception {
         String marker = uniqueMarker();
