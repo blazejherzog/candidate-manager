@@ -12,5 +12,7 @@ public interface JobOfferRepository extends JpaRepository<JobOffer, UUID>, JpaSp
 
     Optional<JobOffer> findByIdAndRecruiterId(UUID id, UUID recruiterId);
 
+    boolean existsByIdAndRecruiterId(UUID id, UUID recruiterId);
+
     Page<JobOffer> findByRecruiterIdOrderByCreatedAtDescIdDesc(UUID recruiterId, Pageable pageable);
 }

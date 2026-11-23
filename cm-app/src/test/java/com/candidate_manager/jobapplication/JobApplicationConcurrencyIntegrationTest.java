@@ -3,6 +3,7 @@ package com.candidate_manager.jobapplication;
 import com.candidate_manager.TestcontainersConfiguration;
 import com.candidate_manager.jobapplication.application.AlreadyAppliedException;
 import com.candidate_manager.jobapplication.application.JobApplicationService;
+import com.candidate_manager.jobapplication.domain.JobApplicationStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +23,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -87,6 +90,35 @@ class JobApplicationConcurrencyIntegrationTest {
         assertExactlyOneAccepted(outcomes);
         Map<String, Object> row = jdbcTemplate.queryForMap("SELECT status, version FROM job_application WHERE id = ?", applicationId);
         assertThat(row).containsEntry("status", "WITHDRAWN").containsEntry("version", 1L);
+    }
+
+    @Test
+    void acceptsEitherWithdrawalOrStatusChangeWhenRequestedConcurrently() throws Exception {
+        UUID recruiterId = UUID.randomUUID();
+        UUID userId = testData.registeredCandidate();
+        UUID applicationId = jobApplicationService.apply(testData.publishedOfferOf(recruiterId), userId, null).id();
+        List<Future<Outcome>> outcomes = new ArrayList<>();
+        AtomicInteger requestCounter = new AtomicInteger();
+        AtomicReference<JobApplicationStatus> acceptedStatus = new AtomicReference<>();
+
+        try (ExecutorService executor = Executors.newFixedThreadPool(CONCURRENT_REQUESTS)) {
+            transactionTemplate.executeWithoutResult(transactionHoldingRowLock -> {
+                jdbcTemplate.queryForMap("SELECT id FROM job_application WHERE id = ? FOR UPDATE", applicationId);
+                submitConcurrently(executor, outcomes, () -> {
+                    boolean requestedByCandidate = requestCounter.getAndIncrement() % 2 == 0;
+                    acceptedStatus.set(requestedByCandidate
+                            ? jobApplicationService.withdraw(applicationId, userId).status()
+                            : jobApplicationService.changeStatus(applicationId, recruiterId, JobApplicationStatus.HIRED, 0).status());
+                    return Outcome.ACCEPTED;
+                });
+                await().atMost(Duration.ofSeconds(10)).until(() ->
+                        jdbcTemplate.queryForObject(UPDATES_WAITING_FOR_LOCK, Integer.class) == CONCURRENT_REQUESTS);
+            });
+        }
+
+        assertExactlyOneAccepted(outcomes);
+        Map<String, Object> row = jdbcTemplate.queryForMap("SELECT status, version FROM job_application WHERE id = ?", applicationId);
+        assertThat(row).containsEntry("status", acceptedStatus.get().name()).containsEntry("version", 1L);
     }
 
     private static void submitConcurrently(ExecutorService executor, List<Future<Outcome>> outcomes, Callable<Outcome> request) {

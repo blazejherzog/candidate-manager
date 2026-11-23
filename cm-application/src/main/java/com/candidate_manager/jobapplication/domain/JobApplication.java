@@ -79,6 +79,23 @@ public class JobApplication {
         updatedAt = now;
     }
 
+    public void changeStatus(JobApplicationStatus newStatus, Instant now) {
+        requireOpen();
+        if (!status.canBeChangedByRecruiterTo(newStatus)) {
+            throw new JobApplicationStatusChangeNotAllowedException(id, status, newStatus);
+        }
+        status = newStatus;
+        updatedAt = now;
+    }
+
+    public boolean isWithdrawn() {
+        return status == JobApplicationStatus.WITHDRAWN;
+    }
+
+    public boolean hasVersion(long expectedVersion) {
+        return version == expectedVersion;
+    }
+
     private void requireOpen() {
         if (status.isFinal()) {
             throw new JobApplicationClosedException(id, status);

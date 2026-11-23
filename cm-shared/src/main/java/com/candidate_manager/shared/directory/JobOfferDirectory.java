@@ -6,4 +6,6 @@ import java.util.UUID;
 public interface JobOfferDirectory {
 
     Optional<ActiveJobOffer> findActiveOffer(UUID jobOfferId);
+
+    boolean isOfferOwnedBy(UUID jobOfferId, UUID recruiterId);
 }

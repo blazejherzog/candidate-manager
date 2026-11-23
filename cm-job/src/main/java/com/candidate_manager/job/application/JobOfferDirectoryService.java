@@ -29,6 +29,12 @@ class JobOfferDirectoryService implements JobOfferDirectory {
                 .map(JobOfferDirectoryService::toActiveJobOffer);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isOfferOwnedBy(UUID jobOfferId, UUID recruiterId) {
+        return jobOfferRepository.existsByIdAndRecruiterId(jobOfferId, recruiterId);
+    }
+
     private static ActiveJobOffer toActiveJobOffer(JobOffer offer) {
         return new ActiveJobOffer(offer.getId(), offer.getRecruiterId(), offer.getTitle(), offer.getCompanyName());
     }
