@@ -38,6 +38,7 @@ public class JobOfferController {
 
     @PostMapping("/api/job-offers")
     @PreAuthorize("hasRole('RECRUITER')")
+    @ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<JobOfferDetails> createDraft(@Valid @RequestBody JobOfferRequest request, Principal recruiter) {
         JobOfferDetails draft = jobOfferService.createDraft(userIdOf(recruiter), request.toContent());
         URI location = ServletUriComponentsBuilder.fromCurrentRequestUri()

@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
@@ -24,6 +25,7 @@ class RealmUserPolicyIntegrationTest {
 
     private static final String PASSWORD = "Secret-pass-1";
     private static final int FAILED_LOGINS_BEFORE_LOCKOUT = 5;
+    private static final String FRONTEND_CALLBACK = "http://localhost:5173/callback";
 
     @Autowired
     private MockMvc mockMvc;
@@ -75,6 +77,35 @@ class RealmUserPolicyIntegrationTest {
         }
 
         assertThat(keycloak.passwordLoginStatus(username, PASSWORD).is4xxClientError()).isTrue();
+    }
+
+    @Test
+    void startsBrowserLoginForFrontendWithPkce() {
+        assertThat(keycloak.startBrowserLogin(FRONTEND_CALLBACK, true).getStatusCode().value()).isEqualTo(200);
+    }
+
+    @Test
+    void rejectsBrowserLoginRedirectingOutsideFrontend() {
+        assertThat(keycloak.startBrowserLogin("http://localhost:3000/callback", true).getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    void requiresPkceForBrowserLogin() {
+        ResponseEntity<Void> response = keycloak.startBrowserLogin(FRONTEND_CALLBACK, false);
+
+        assertThat(response.getStatusCode().is3xxRedirection()).isTrue();
+        assertThat(response.getHeaders().getLocation()).asString()
+                .startsWith(FRONTEND_CALLBACK)
+                .contains("error=invalid_request");
+    }
+
+    @Test
+    void acceptsRefreshTokenOnlyOnce() throws Exception {
+        String username = registerCandidate();
+        String firstRefreshToken = keycloak.refreshTokenOf(username, PASSWORD);
+
+        assertThat(keycloak.refresh(firstRefreshToken).getStatusCode().value()).isEqualTo(200);
+        assertThat(keycloak.refresh(firstRefreshToken).getStatusCode().value()).isEqualTo(400);
     }
 
     private String registerCandidate() throws Exception {

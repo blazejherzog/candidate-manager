@@ -6,6 +6,8 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "passwordPolicy": "length(8)",
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
   "bruteForceProtected": true,
   "permanentLockout": false,
   "failureFactor": 5,
@@ -53,7 +55,7 @@
     {
       "clientId": "cm-web",
       "name": "Candidate Manager web",
-      "description": "Public client used by users to log in. Direct access grants are enabled for local development (curl).",
+      "description": "Public client of the browser application (authorization code with PKCE). Redirect URIs and direct access grants (curl) are for local development only.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -61,13 +63,15 @@
       "directAccessGrantsEnabled": true,
       "implicitFlowEnabled": false,
       "redirectUris": [
-        "http://localhost:*"
+        "http://localhost:5173/*",
+        "http://localhost:8080/swagger-ui/oauth2-redirect.html"
       ],
       "webOrigins": [
         "+"
       ],
       "attributes": {
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
       },
       "protocolMappers": [
         {

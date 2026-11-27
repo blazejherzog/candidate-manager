@@ -3,6 +3,20 @@ server:
 
 app:
   time-zone: Europe/Warsaw
+  cors:
+    allowed-origins: []
+
+springdoc:
+  paths-to-match: /api/**
+  default-flat-param-object: true
+  default-produces-media-type: application/json
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+    oauth:
+      client-id: cm-web
+      use-pkce-with-authorization-code-grant: true
 
 spring:
   datasource:

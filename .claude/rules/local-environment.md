@@ -22,6 +22,8 @@ paths:
   (secret manager); the realm there is not imported from this file. Without it the application does not start.
   Keep the empty default in `${KEYCLOAK_CLIENT_SECRET:}`: an unresolved placeholder would be bound as literal
   text and pass `@NotBlank`, so a missing secret would only show up as 502 on the first registration.
+- Swagger UI: http://localhost:8080/swagger-ui.html ("Authorize" logs in through `cm-web` with PKCE). The frontend dev
+  server is expected on http://localhost:5173.
 - Register and log in (local only; `cm-web` allows the password grant for curl):
   ```bash
   curl -X POST localhost:8080/api/auth/register/candidate -H 'Content-Type: application/json' \

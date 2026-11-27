@@ -4,6 +4,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -78,6 +79,38 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(form)
                 .exchange((request, response) -> response.getStatusCode());
+    }
+
+    public ResponseEntity<Void> startBrowserLogin(String redirectUri, boolean withPkceChallenge) {
+        String challenge = withPkceChallenge ? "&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256" : "";
+        return client().get()
+                .uri("/realms/{realm}/protocol/openid-connect/auth?client_id=cm-web&response_type=code&scope=openid&redirect_uri={redirectUri}"
+                        + challenge, REALM, redirectUri)
+                .exchange((request, response) -> ResponseEntity.status(response.getStatusCode())
+                        .headers(response.getHeaders()).build());
+    }
+
+    public String refreshTokenOf(String username, String password) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "password");
+        form.add("client_id", "cm-web");
+        form.add("username", username);
+        form.add("password", password);
+        return tokenResponse(REALM, form).get("refresh_token").toString();
+    }
+
+    public ResponseEntity<Map<String, Object>> refresh(String refreshToken) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "refresh_token");
+        form.add("client_id", "cm-web");
+        form.add("refresh_token", refreshToken);
+        return client().post()
+                .uri("/realms/{realm}/protocol/openid-connect/token", REALM)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .exchange((request, response) -> ResponseEntity.status(response.getStatusCode())
+                        .body(response.bodyTo(new ParameterizedTypeReference<Map<String, Object>>() {
+                        })));
     }
 
     public HttpStatusCode updateOwnAccount(String userToken, Map<String, Object> account) {
@@ -165,6 +198,10 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
     }
 
     private String token(String realm, MultiValueMap<String, String> form) {
+        return String.valueOf(tokenResponse(realm, form).get("access_token"));
+    }
+
+    private Map<String, Object> tokenResponse(String realm, MultiValueMap<String, String> form) {
         Map<String, Object> response = client().post()
                 .uri("/realms/{realm}/protocol/openid-connect/token", realm)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -172,7 +209,7 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
                 .retrieve()
                 .body(new ParameterizedTypeReference<>() {
                 });
-        return String.valueOf(Objects.requireNonNull(response).get("access_token"));
+        return Objects.requireNonNull(response);
     }
 
     private List<Map<String, Object>> adminGet(String token, String uri, Object... variables) {

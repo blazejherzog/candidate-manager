@@ -56,13 +56,16 @@ Loaded when working on matching files (`paths` in each file):
 - `candidates.md`: `cm-candidate` profile, name ownership, lost update detection.
 - `job-offers.md`: `cm-job` lifecycle, visibility, expiration, public search and its performance guards.
 - `job-applications.md`: `cm-application` statuses, uniqueness, visibility, reading other modules.
+- `frontend-contract.md`: browser login with PKCE, CORS, OpenAPI description and its committed snapshot.
 - `application-history.md`: `cm-event` consumers, ordering, visibility of the process history.
 
 A new domain module gets its own rule file scoped to its paths.
 
 ## Known technical debt
 - Anyone can register as `RECRUITER` (no email verification or approval).
-- Registration endpoints have no rate limiting.
+- Registration endpoints have no rate limiting (they are now called from the browser).
+- Keycloak realm in the repo is for local development: production needs exact `cm-web` redirect URIs, disabled direct
+  access grants and its own client secret.
 - Recruiters cannot change their own first and last name (no recruiter profile yet).
 - Outbox: a row that always fails to send (e.g. missing exchange) blocks the rows behind it; deliberate
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
