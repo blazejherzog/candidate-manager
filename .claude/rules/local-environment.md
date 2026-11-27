@@ -12,6 +12,8 @@ paths:
 - `cm-realm` is imported from `docker-init-keycloak/cm-realm-realm.json` on Keycloak's first start
   (the file name must be `<realm>-realm.json`). An existing realm is never overwritten: after changing
   the file, delete the realm in the admin console or remove the `keycloak_pgdata` volume.
+  Without the current realm the `registrationId` attribute is dropped silently and incomplete registrations cannot
+  be cleaned up.
 - The `cm-backend` client secret is fixed for local development only: the realm file sets it and
   `application-local.yaml` repeats it. It protects nothing beyond the local Keycloak, whose admin login is in
   `docker-compose.yaml` anyway. `spring-boot:run` activates the `local` profile (`cm-app/pom.xml`);

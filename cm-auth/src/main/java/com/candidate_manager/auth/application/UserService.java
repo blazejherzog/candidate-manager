@@ -2,6 +2,7 @@ package com.candidate_manager.auth.application;
 
 import com.candidate_manager.auth.domain.UserRole;
 import com.candidate_manager.auth.infrastructure.KeycloakAdminClient;
+import com.candidate_manager.auth.infrastructure.PendingRegistrationRepository;
 import com.candidate_manager.shared.config.messaging.publisher.EventPublisher;
 import com.candidate_manager.shared.event.CandidateRegisteredEvent;
 import lombok.RequiredArgsConstructor;
@@ -20,19 +21,34 @@ public class UserService {
     private final KeycloakAdminClient keycloakAdminClient;
     private final EventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
+    private final PendingRegistrationRepository pendingRegistrationRepository;
+    private final IncompleteRegistrationCleanup incompleteRegistrationCleanup;
 
     public void registerUser(RegisterUserCommand command, UserRole role) {
-        String userId = keycloakAdminClient.createUser(command);
+        UUID registrationId = UUID.randomUUID();
+        pendingRegistrationRepository.insert(registrationId, Instant.now());
+        String userId;
         try {
+            userId = keycloakAdminClient.createUser(command, registrationId);
             keycloakAdminClient.assignRealmRole(userId, role);
-            if (role == UserRole.CANDIDATE) {
-                publishCandidateRegistered(userId, command);
-            }
-        } catch (RuntimeException e) {
-            deleteIncompletelyRegisteredUser(userId);
-            throw e;
+            transactionTemplate.executeWithoutResult(transaction -> completeRegistration(registrationId, userId, command, role));
+        } catch (UserAlreadyExistsException nothingWasCreated) {
+            pendingRegistrationRepository.delete(registrationId);
+            throw nothingWasCreated;
+        } catch (RuntimeException registrationFailure) {
+            incompleteRegistrationCleanup.cleanUpAfterFailure(registrationId);
+            throw registrationFailure;
         }
         log.info("Registered user {} with role {}", userId, role);
+    }
+
+    private void completeRegistration(UUID registrationId, String userId, RegisterUserCommand command, UserRole role) {
+        if (role == UserRole.CANDIDATE) {
+            publishCandidateRegistered(userId, command);
+        }
+        if (!pendingRegistrationRepository.delete(registrationId)) {
+            throw new RegistrationExpiredException();
+        }
     }
 
     private void publishCandidateRegistered(String userId, RegisterUserCommand command) {
@@ -43,14 +59,6 @@ public class UserService {
                 command.email(),
                 command.firstName(),
                 command.lastName());
-        transactionTemplate.executeWithoutResult(status -> eventPublisher.publish(event));
-    }
-
-    private void deleteIncompletelyRegisteredUser(String userId) {
-        try {
-            keycloakAdminClient.deleteUser(userId);
-        } catch (RuntimeException e) {
-            log.error("User {} was not fully registered and could not be deleted; delete it manually in Keycloak", userId, e);
-        }
+        eventPublisher.publish(event);
     }
 }

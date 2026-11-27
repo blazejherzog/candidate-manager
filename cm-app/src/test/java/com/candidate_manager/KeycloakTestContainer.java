@@ -90,6 +90,22 @@ public class KeycloakTestContainer extends GenericContainer<KeycloakTestContaine
                 .exchange((request, response) -> response.getStatusCode());
     }
 
+    public void createUserWithRegistrationId(String username, UUID registrationId) {
+        client().post()
+                .uri("/admin/realms/{realm}/users", REALM)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + masterAdminToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "username", username,
+                        "email", username + "@example.com",
+                        "firstName", "Jan",
+                        "lastName", "Kowalski",
+                        "enabled", true,
+                        "attributes", Map.of("registrationId", List.of(registrationId.toString()))))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     public Map<String, Object> userRepresentationOf(String username) {
         return adminGet(masterAdminToken(), "/admin/realms/{realm}/users?username={username}&exact=true", REALM, username)
                 .get(0);

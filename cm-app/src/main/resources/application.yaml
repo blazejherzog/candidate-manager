@@ -55,6 +55,14 @@ rabbitmq:
       routing-key: application.application-status-changed
       durable: true
 
+registration:
+  cleanup:
+    enabled: true
+    fixed-delay: PT1M
+    stale-after: PT2M
+    abandon-after: PT1H
+    batch-size: 20
+
 outbox:
   relay:
     enabled: true

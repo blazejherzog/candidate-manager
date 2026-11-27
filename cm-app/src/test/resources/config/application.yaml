@@ -2,6 +2,10 @@ outbox:
   relay:
     enabled: false
 
+registration:
+  cleanup:
+    enabled: false
+
 messaging:
   retention:
     enabled: false

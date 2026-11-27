@@ -22,10 +22,14 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
 public class KeycloakAdminClient {
+
+    private static final String REGISTRATION_ID_ATTRIBUTE = "registrationId";
 
     private final KeycloakProperties keycloakProperties;
     private final RestClient restClient;
@@ -35,14 +39,15 @@ public class KeycloakAdminClient {
         this.restClient = restClientBuilder.baseUrl(keycloakProperties.getUrl()).build();
     }
 
-    public String createUser(RegisterUserCommand command) {
+    public String createUser(RegisterUserCommand command, UUID registrationId) {
         UserRepresentation user = new UserRepresentation(
                 command.username(),
                 command.email(),
                 command.firstName(),
                 command.lastName(),
                 true,
-                List.of(new CredentialRepresentation("password", command.password(), false)));
+                List.of(new CredentialRepresentation("password", command.password(), false)),
+                Map.of(REGISTRATION_ID_ATTRIBUTE, List.of(registrationId.toString())));
         try {
             ResponseEntity<Void> response = restClient.post()
                     .uri("/admin/realms/{realm}/users", realm())
@@ -83,13 +88,34 @@ public class KeycloakAdminClient {
         }
     }
 
-    public void deleteUser(String userId) {
+    public Optional<String> findUserIdByRegistrationId(UUID registrationId) {
+        try {
+            List<UserSearchResult> users = restClient.get()
+                    .uri("/admin/realms/{realm}/users?q={query}&briefRepresentation=false",
+                            realm(), REGISTRATION_ID_ATTRIBUTE + ":" + registrationId)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken()))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return Objects.requireNonNull(users).stream()
+                    .filter(user -> user.hasRegistrationId(registrationId))
+                    .map(UserSearchResult::id)
+                    .findFirst();
+        } catch (RestClientException e) {
+            log.error("Keycloak: failed to find user of registration {}", registrationId, e);
+            throw new IdentityProviderException(e);
+        }
+    }
+
+    public void deleteUserIfExists(String userId) {
         try {
             restClient.delete()
                     .uri("/admin/realms/{realm}/users/{id}", realm(), userId)
                     .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken()))
                     .retrieve()
                     .toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound alreadyDeleted) {
+            log.info("Keycloak: user {} was already deleted", userId);
         } catch (RestClientException e) {
             log.error("Keycloak: failed to delete user {}", userId, e);
             throw new IdentityProviderException(e);
@@ -133,7 +159,16 @@ public class KeycloakAdminClient {
             String firstName,
             String lastName,
             boolean enabled,
-            List<CredentialRepresentation> credentials) {
+            List<CredentialRepresentation> credentials,
+            Map<String, List<String>> attributes) {
+    }
+
+    private record UserSearchResult(String id, Map<String, List<String>> attributes) {
+
+        boolean hasRegistrationId(UUID registrationId) {
+            return attributes != null
+                    && attributes.getOrDefault(REGISTRATION_ID_ATTRIBUTE, List.of()).contains(registrationId.toString());
+        }
     }
 
     private record CredentialRepresentation(String type, String value, boolean temporary) {

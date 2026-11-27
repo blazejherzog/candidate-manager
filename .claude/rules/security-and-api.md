@@ -18,8 +18,16 @@ paths:
 - The API accepts only tokens with audience `cm-backend`. `realm_access.roles` are mapped to `ROLE_<name>`,
   so use `@PreAuthorize("hasRole('RECRUITER')")`. All endpoints except registration and
   `GET /api/job-offers`, `GET /api/job-offers/{id}` require a token; an invalid token is rejected (401) everywhere.
-- Registration is not transactional across Keycloak calls: if assigning the role or storing the
-  `CandidateRegisteredEvent` in the outbox fails, the created user is deleted again (`UserService`).
+- Registration is not transactional across Keycloak calls, and a timeout does not say whether Keycloak created the
+  user. Every registration therefore gets a random `registrationId`: a `pending_registration` row is stored before
+  Keycloak is called, the user gets it as the admin-only attribute `registrationId`, and the row is deleted in the
+  transaction that completes the registration (with `CandidateRegisteredEvent`). On failure the user carrying that id is
+  deleted at once; a conflict (409) deletes nothing. `IncompleteRegistrationCleanup` runs every minute for rows older
+  than 2 minutes (a registration takes at most about 35 s): it deletes the user carrying the id, or keeps checking for
+  1 hour in case Keycloak creates the user late. The cleanup locks rows with `FOR UPDATE SKIP LOCKED` and completion
+  deletes the same row, so exactly one of them wins; a registration completed too late answers 503.
+- Never delete a Keycloak user found by username or email after an ambiguous failure: a timeout can hide a 409, and the
+  user would belong to someone else. Only the `registrationId` attribute identifies users of this registration.
 - Candidate registration publishes `CandidateRegisteredEvent`; `cm-candidate` consumes it and creates the
   candidate profile (`candidate`, linked to the Keycloak user by the unique `user_id`). Recruiter
   registration publishes no event yet.
