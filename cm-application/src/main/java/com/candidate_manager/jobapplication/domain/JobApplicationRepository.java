@@ -14,6 +14,10 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     Optional<JobApplication> findByIdAndRecruiterId(UUID id, UUID recruiterId);
 
+    boolean existsByIdAndCandidateId(UUID id, UUID candidateId);
+
+    boolean existsByIdAndRecruiterId(UUID id, UUID recruiterId);
+
     Page<JobApplication> findByJobOfferIdAndStatusInOrderBySubmittedAtDescIdDesc(
             UUID jobOfferId, Collection<JobApplicationStatus> statuses, Pageable pageable);
 

@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.candidate_manager.messaging.OutboxRelayTestSupport.relayAllPendingEvents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -58,7 +59,7 @@ class CandidateProfileCreationIntegrationTest {
         String username = uniqueUsername();
 
         register("/api/auth/register/candidate", username);
-        outboxRelay.publishPendingEvents();
+        relayAllPendingEvents(outboxRelay);
 
         await().atMost(Duration.ofSeconds(10)).until(() -> countProfilesWithEmail(emailOf(username)) == 1);
         Map<String, Object> profile = jdbcTemplate.queryForMap(
@@ -73,7 +74,7 @@ class CandidateProfileCreationIntegrationTest {
         String username = uniqueUsername();
         register("/api/auth/register/candidate", username);
         String payload = candidateRegisteredPayloadFor(emailOf(username));
-        outboxRelay.publishPendingEvents();
+        relayAllPendingEvents(outboxRelay);
         await().atMost(Duration.ofSeconds(10)).until(() -> countProfilesWithEmail(emailOf(username)) == 1);
         rabbitAdmin.purgeQueue(CANDIDATE_REGISTERED_DEAD_LETTER_QUEUE, false);
 

@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, JobApplicationTestData.class})
+@Import(TestcontainersConfiguration.class)
 class RecruiterJobApplicationIntegrationTest {
 
     private static final String MESSAGE = "I have five years of Java experience.";

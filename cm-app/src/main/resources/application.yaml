@@ -46,6 +46,14 @@ rabbitmq:
       exchange: cm.auth
       routing-key: auth.candidate-registered
       durable: true
+    - name: cm-event.application-submitted
+      exchange: cm.application
+      routing-key: application.application-submitted
+      durable: true
+    - name: cm-event.application-status-changed
+      exchange: cm.application
+      routing-key: application.application-status-changed
+      durable: true
 
 outbox:
   relay:

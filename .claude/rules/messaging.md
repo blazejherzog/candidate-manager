@@ -29,6 +29,8 @@ paths:
   A breaking change means a new event type.
 - Queues, exchanges and bindings are a `Declarables` bean declared on the first broker connection, so the
   application starts without RabbitMQ and listeners connect once the broker is available.
+- An exchange is declared only together with a queue bound to it. An event without any consumer would go to a missing
+  exchange and block the whole outbox, so add a new producing exchange together with its first consumer.
 - Every configured queue gets a dead-letter queue `<queue>.dlq` (via exchange `cm.dlx`); messages
   matching no binding go to `cm.unroutable.queue` (alternate exchange `cm.unroutable`).
 - RabbitMQ cannot change arguments of an existing queue/exchange (`PRECONDITION_FAILED`). After changing

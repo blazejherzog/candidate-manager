@@ -21,7 +21,7 @@ Single deployable artifact (`cm-app`), split into Maven modules by domain:
 | `cm-job` | Job offers |
 | `cm-application` | Job applications (candidate applies, recruiter decides) |
 | `cm-resume` | Candidate resumes |
-| `cm-event` | Recruitment process events |
+| `cm-event` | Recruitment process history built from events |
 | `cm-integration` | External integrations |
 
 Rules:
@@ -56,6 +56,7 @@ Loaded when working on matching files (`paths` in each file):
 - `candidates.md`: `cm-candidate` profile, name ownership, lost update detection.
 - `job-offers.md`: `cm-job` lifecycle, visibility, expiration, public search and its performance guards.
 - `job-applications.md`: `cm-application` statuses, uniqueness, visibility, reading other modules.
+- `application-history.md`: `cm-event` consumers, ordering, visibility of the process history.
 
 A new domain module gets its own rule file scoped to its paths.
 
@@ -67,7 +68,8 @@ A new domain module gets its own rule file scoped to its paths.
   fail-loud choice. Alternative if needed: `attempts` + `next_attempt_at` columns with backoff.
 - Outbox: one publisher confirm per message; if throughput becomes a problem, measure first, then consider
   more relay instances, batched confirms or correlated confirms.
-- Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling.
+- Dead-lettered and unroutable messages are only stored; there is no alerting or re-drive tooling
+  (a dead-lettered application event leaves a gap in the process history).
 - Job offers: "at least one salary" is enforced only by request validation, because it spans two tables.
 - Job offers: expiration is only derived from the date (see `cm-job`). When a module has to react to it (notify
   applicants, close the recruitment process), add an `EXPIRED` status set by a scheduler that publishes a
@@ -75,4 +77,3 @@ A new domain module gets its own rule file scoped to its paths.
 - Job offers: recruiters cannot close an offer before its `validUntil` yet. When they can, applying must lock the offer
   row (e.g. `FOR SHARE` in `JobOfferDirectory`), otherwise an application may be stored after closing.
 - Job applications: offers have no vacancy limit; adding one requires a lock or constraint for concurrent hiring.
-- Job applications: changes made before the process history (`cm-event`) exists are not recorded as events.

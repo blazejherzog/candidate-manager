@@ -18,36 +18,36 @@ import java.util.List;
 import java.util.UUID;
 
 @TestComponent
-class JobApplicationTestData {
+public class JobApplicationTestData {
 
-    static final String OFFER_TITLE = "Senior Java Developer";
-    static final String COMPANY_NAME = "Acme Sp. z o.o.";
+    public static final String OFFER_TITLE = "Senior Java Developer";
+    public static final String COMPANY_NAME = "Acme Sp. z o.o.";
 
     private final JobOfferService jobOfferService;
     private final CandidateProfileService candidateProfileService;
 
-    JobApplicationTestData(JobOfferService jobOfferService, CandidateProfileService candidateProfileService) {
+    public JobApplicationTestData(JobOfferService jobOfferService, CandidateProfileService candidateProfileService) {
         this.jobOfferService = jobOfferService;
         this.candidateProfileService = candidateProfileService;
     }
 
-    UUID registeredCandidate() {
+    public UUID registeredCandidate() {
         UUID userId = UUID.randomUUID();
         candidateProfileService.createProfile(userId, userId + "@example.com", "Jan", "Kowalski");
         return userId;
     }
 
-    UUID draftOfferOf(UUID recruiterId) {
+    public UUID draftOfferOf(UUID recruiterId) {
         return jobOfferService.createDraft(recruiterId, offerContent()).id();
     }
 
-    UUID publishedOfferOf(UUID recruiterId) {
+    public UUID publishedOfferOf(UUID recruiterId) {
         UUID offerId = draftOfferOf(recruiterId);
         jobOfferService.publish(offerId, recruiterId);
         return offerId;
     }
 
-    UUID publishedOffer() {
+    public UUID publishedOffer() {
         return publishedOfferOf(UUID.randomUUID());
     }
 

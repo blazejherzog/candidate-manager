@@ -4,8 +4,12 @@ import com.candidate_manager.TestcontainersConfiguration;
 import com.candidate_manager.jobapplication.application.AlreadyAppliedException;
 import com.candidate_manager.jobapplication.application.JobApplicationService;
 import com.candidate_manager.jobapplication.domain.JobApplicationStatus;
+import com.candidate_manager.shared.config.messaging.event.DomainEvent;
+import com.candidate_manager.shared.event.JobApplicationStatusChangedEvent;
+import com.candidate_manager.shared.event.JobApplicationSubmittedEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,7 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @SpringBootTest
-@Import({TestcontainersConfiguration.class, JobApplicationTestData.class})
+@AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
 class JobApplicationConcurrencyIntegrationTest {
 
     private static final int CONCURRENT_REQUESTS = 4;
@@ -67,6 +72,7 @@ class JobApplicationConcurrencyIntegrationTest {
         assertExactlyOneAccepted(outcomes);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM job_application WHERE job_offer_id = ?", Integer.class, offerId)).isEqualTo(1);
+        assertThat(countOutboxEvents("jobOfferId", offerId, JobApplicationSubmittedEvent.class)).isEqualTo(1);
     }
 
     @Test
@@ -90,6 +96,7 @@ class JobApplicationConcurrencyIntegrationTest {
         assertExactlyOneAccepted(outcomes);
         Map<String, Object> row = jdbcTemplate.queryForMap("SELECT status, version FROM job_application WHERE id = ?", applicationId);
         assertThat(row).containsEntry("status", "WITHDRAWN").containsEntry("version", 1L);
+        assertThat(countOutboxEvents("jobApplicationId", applicationId, JobApplicationStatusChangedEvent.class)).isEqualTo(1);
     }
 
     @Test
@@ -119,6 +126,12 @@ class JobApplicationConcurrencyIntegrationTest {
         assertExactlyOneAccepted(outcomes);
         Map<String, Object> row = jdbcTemplate.queryForMap("SELECT status, version FROM job_application WHERE id = ?", applicationId);
         assertThat(row).containsEntry("status", acceptedStatus.get().name()).containsEntry("version", 1L);
+        assertThat(countOutboxEvents("jobApplicationId", applicationId, JobApplicationStatusChangedEvent.class)).isEqualTo(1);
+    }
+
+    private int countOutboxEvents(String identifierField, UUID identifier, Class<? extends DomainEvent> eventType) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM outbox_event WHERE payload->>? = ? AND event_type = ?",
+                Integer.class, identifierField, identifier.toString(), eventType.getName());
     }
 
     private static void submitConcurrently(ExecutorService executor, List<Future<Outcome>> outcomes, Callable<Outcome> request) {

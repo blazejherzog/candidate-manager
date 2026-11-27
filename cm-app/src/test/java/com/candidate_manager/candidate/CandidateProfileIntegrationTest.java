@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static com.candidate_manager.messaging.OutboxRelayTestSupport.relayAllPendingEvents;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasItem;
@@ -70,7 +71,7 @@ class CandidateProfileIntegrationTest {
                         {"username": "%s", "email": "%s@example.com", "password": "%s", "firstName": "Jan", "lastName": "Kowalski"}
                         """.formatted(username, username, PASSWORD)))
                 .andExpect(status().isCreated());
-        outboxRelay.publishPendingEvents();
+        relayAllPendingEvents(outboxRelay);
         UUID userId = keycloak.userIdOf(username);
         await().atMost(Duration.ofSeconds(10)).until(() -> profileExists(userId));
 

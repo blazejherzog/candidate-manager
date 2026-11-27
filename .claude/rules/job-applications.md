@@ -29,5 +29,4 @@ paths:
 - Contact data is read live from `cm-candidate` (one query per page). After withdrawal the recruiter sees only the
   first and last name: no email, phone number or message.
 - Expiration of the offer does not block handling or withdrawing applications already submitted.
-- No events yet: an exchange is declared only together with a queue bound to it, so an event without a consumer
-  would go to a missing exchange and block the whole outbox. Add events together with their first consumer.
+- Submission and every status change publish an event (see `application-history.md`).

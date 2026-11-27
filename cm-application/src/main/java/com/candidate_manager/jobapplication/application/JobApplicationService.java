@@ -7,6 +7,7 @@ import com.candidate_manager.shared.directory.ActiveJobOffer;
 import com.candidate_manager.shared.directory.CandidateContact;
 import com.candidate_manager.shared.directory.CandidateDirectory;
 import com.candidate_manager.shared.directory.JobOfferDirectory;
+import com.candidate_manager.shared.event.JobApplicationActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
@@ -32,6 +33,7 @@ public class JobApplicationService {
     private final JobApplicationRepository jobApplicationRepository;
     private final JobOfferDirectory jobOfferDirectory;
     private final CandidateDirectory candidateDirectory;
+    private final JobApplicationEventPublisher jobApplicationEventPublisher;
 
     @Transactional
     public JobApplicationDetails apply(UUID jobOfferId, UUID userId, String message) {
@@ -41,6 +43,7 @@ public class JobApplicationService {
                 .orElseThrow(CandidateProfileMissingException::new);
         JobApplication application = saveUnlessAlreadyApplied(
                 JobApplication.submit(offer, candidateId, message, Instant.now()));
+        jobApplicationEventPublisher.publishSubmitted(application, userId);
         log.info("Candidate {} applied for job offer {} with application {}", candidateId, jobOfferId, application.getId());
         return JobApplicationDetails.forCandidate(application);
     }
@@ -62,8 +65,10 @@ public class JobApplicationService {
     @Transactional
     public JobApplicationDetails withdraw(UUID jobApplicationId, UUID userId) {
         JobApplication application = findApplicationOfUser(jobApplicationId, userId);
+        JobApplicationStatus previousStatus = application.getStatus();
         application.withdraw(Instant.now());
         jobApplicationRepository.saveAndFlush(application);
+        jobApplicationEventPublisher.publishStatusChanged(application, previousStatus, JobApplicationActor.CANDIDATE, userId);
         log.info("Candidate {} withdrew application {}", application.getCandidateId(), jobApplicationId);
         return JobApplicationDetails.forCandidate(application);
     }
@@ -92,8 +97,10 @@ public class JobApplicationService {
         if (!application.hasVersion(expectedVersion)) {
             throw new ObjectOptimisticLockingFailureException(JobApplication.class, jobApplicationId);
         }
+        JobApplicationStatus previousStatus = application.getStatus();
         application.changeStatus(newStatus, Instant.now());
         jobApplicationRepository.saveAndFlush(application);
+        jobApplicationEventPublisher.publishStatusChanged(application, previousStatus, JobApplicationActor.RECRUITER, recruiterId);
         log.info("Recruiter {} changed application {} to {}", recruiterId, jobApplicationId, newStatus);
         return detailsForRecruiter(application);
     }

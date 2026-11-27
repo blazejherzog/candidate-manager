@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, JobApplicationTestData.class})
+@Import(TestcontainersConfiguration.class)
 class CandidateJobApplicationIntegrationTest {
 
     private static final String OWN_APPLICATIONS = "/api/candidates/me/applications";
